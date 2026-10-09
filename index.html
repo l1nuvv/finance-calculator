@@ -27,16 +27,22 @@
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="mark">◈</span><span>КОНТУР</span
-          ><small>личные финансы</small>
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2 22 12 12 22 2 12Z M12 7 17 12 12 17 7 12Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            /></svg
+          ><span>КОНТУР</span><small>бюджет для двоих</small>
         </div>
         <nav id="nav" aria-label="Разделы приложения">
           <button data-tab="overview" class="selected">Обзор</button
           ><button data-tab="operations">Операции</button
           ><button data-tab="calendar">Календарь</button
-          ><button data-tab="debts">Кредиты и долги</button
-          ><button data-tab="history">История изменений</button
-          ><button data-tab="settings">Данные и настройки</button
+          ><button data-tab="debts">Долги</button
+          ><button data-tab="history">История</button
+          ><button data-tab="settings">Настройки</button
           ><button data-tab="help">Помощь</button>
         </nav>
         <div class="aside-foot">
@@ -49,7 +55,6 @@
       <main class="content" id="main-content">
         <header class="top">
           <div>
-            <div class="eyebrow">ФИНАНСОВОЕ ПЛАНИРОВАНИЕ</div>
             <h1 id="heading">Обзор</h1>
           </div>
           <div class="head-actions">
@@ -81,7 +86,7 @@
                 <option value="365">Год</option>
               </select></label
             ><label
-              >Сценарий
+              >Прогноз
               <select id="scenario">
                 <option value="base">Базовый</option>
                 <option value="conservative">Консервативный</option>
@@ -93,7 +98,7 @@
             <div class="stat focus">
               <div>Начальный остаток</div>
               <strong id="current">—</strong
-              ><small>Средства на дату отсчёта</small>
+              ><small>Деньги на начало расчёта</small>
             </div>
             <div class="stat">
               <div>Минимальный остаток</div>
@@ -104,33 +109,20 @@
               <strong id="ending">—</strong><small id="end-date">—</small>
             </div>
             <div class="stat">
-              <div>Необходимо покрыть</div>
+              <div>Не хватает</div>
               <strong id="needed">—</strong><small id="gap-date">—</small>
             </div>
           </div>
-          <article class="panel" id="obligations-panel">
-            <div class="panel-title">
-              <h2>Обязательные платежи</h2>
-              <span id="obligations-period"></span>
-            </div>
-            <div id="obligations-summary" class="loanmetrics"></div>
-            <div id="obligations-list" class="entries"></div>
-            <p class="footnote">
-              Резерв включает неоплаченные обязательные расходы, в том числе в
-              день дохода. Доступная сумма — ориентир по известным операциям;
-              будущие поступления в неё не включены.
-            </p>
-          </article>
           <div class="two">
             <article class="panel wide">
               <div class="panel-title">
-                <h2>Прогноз денежных средств</h2>
+                <h2>Как меняется сумма денег</h2>
                 <span>По дням · ₽</span>
               </div>
               <div id="chart"></div>
               <div class="chart-info">
-                Значения включают операции, запланированные на соответствующий
-                день. Прогноз не гарантирует поступление средств.
+                Сколько останется после платежей каждого дня. Если сумма ниже
+                нуля, денег не хватает.
               </div>
             </article>
             <article class="panel">
@@ -141,11 +133,23 @@
               <div id="upcoming" class="entries"></div>
             </article>
           </div>
-          <article class="panel">
+          <article class="panel" id="obligations-panel">
             <div class="panel-title">
-              <h2>Быстрое сравнение</h2>
-              <span>Изменения не сохраняются в бюджете</span>
+              <h2>Обязательные платежи</h2>
+              <span id="obligations-period"></span>
             </div>
+            <div id="obligations-summary" class="loanmetrics"></div>
+            <div id="obligations-list" class="entries"></div>
+            <p class="footnote">
+              Эти деньги нужно оставить на важные платежи до зарплаты, включая
+              её день. Будущая зарплата здесь ещё не прибавлена.
+            </p>
+          </article>
+          <details class="panel comparison-panel">
+            <summary>Проверить: что будет, если взять в долг</summary>
+            <p class="muted">
+              Только для сравнения — операции не добавятся в бюджет.
+            </p>
             <div class="scenario-form">
               <label
                 >Дополнительный заём, ₽
@@ -160,13 +164,13 @@
               ><button id="compare" class="primary">Сравнить</button>
             </div>
             <div id="comparison"></div>
-          </article>
+          </details>
         </section>
         <section id="operations" class="tab" hidden>
           <article class="panel">
             <div class="panel-title">
               <h2>Операции · план и факт</h2>
-              <span>Регулярные платежи создают прогнозные повторения</span>
+              <span>Планы и уже совершённые платежи</span>
             </div>
             <div class="ops-toolbar">
               <label
@@ -203,7 +207,7 @@
               <h2>Кредитный калькулятор</h2>
               <div class="formgrid">
                 <label
-                  >Тело кредита, ₽
+                  >Сумма кредита, ₽
                   <input
                     id="loan-p"
                     type="number"
@@ -505,7 +509,7 @@
                 такого дохода нет, смотрит на 30 дней вперёд.
               </p>
               <p>
-                «Доступно сверх резерва» — сколько остаётся от рассчитанной
+                «Остаётся после платежей» — сколько остаётся от рассчитанной
                 суммы на сегодня, если оставить деньги на эти важные платежи.
                 Например, есть 20 000 ₽, а до зарплаты нужно заплатить 15 000 ₽:
                 остаётся 5 000 ₽. Будущая зарплата сюда ещё не добавляется.
@@ -566,8 +570,8 @@
               <p>
                 «Минимальный остаток» — меньше всего денег, сколько будет за
                 выбранные дни. «В конце периода» — сколько останется в последний
-                день. «Необходимо покрыть» — сколько денег не хватает, чтобы не
-                уйти в минус.
+                день. «Не хватает» — сколько денег не хватает, чтобы не уйти в
+                минус.
               </p>
               <p>
                 Нажмите день в календаре, чтобы посмотреть платежи. Ежемесячный
@@ -756,11 +760,11 @@
           ><input id="event-paid" type="checkbox" /> Вся операция уже учтена
           (все повторения исключены из прогноза)</label
         >
+        <p id="error" class="error" role="alert"></p>
         <div class="dialogactions">
           <button type="button" id="cancel">Отмена</button
           ><button class="primary" type="submit">Сохранить операцию</button>
         </div>
-        <p id="error" class="error"></p>
       </form>
     </dialog>
     <dialog id="fact-dialog">
@@ -794,7 +798,7 @@
           отсчёта.
         </p>
         <div id="fact-records" class="entries"></div>
-        <p id="fact-error" class="error"></p>
+        <p id="fact-error" class="error" role="alert"></p>
         <div class="dialogactions">
           <button type="button" id="fact-remove">Убрать факт этой даты</button
           ><button type="submit" class="primary">Сохранить факт</button>

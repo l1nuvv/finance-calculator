@@ -176,7 +176,7 @@
     }
   }
   function chart(days) {
-    const w = 800,
+    const w = Math.max(300, $("chart").clientWidth),
       h = 250,
       l = 66,
       r = 16,
@@ -193,11 +193,16 @@
     const coords = days
       .map((d, i) => `${x(i).toFixed(2)},${y(d.closing).toFixed(2)}`)
       .join(" ");
+    const axisFormat = new Intl.NumberFormat("ru-RU", {
+      notation: max - min >= 100000000 ? "compact" : "standard",
+      maximumFractionDigits:
+        max - min >= 100000000 ? 1 : max - min < 1000 ? 2 : 0,
+    });
     let grid = "";
     for (let i = 0; i <= 4; i++) {
       const v = lower + ((upper - lower) * i) / 4,
         pos = y(v);
-      grid += `<line x1="${l}" x2="${w - r}" y1="${pos}" y2="${pos}" stroke="#e4ebe8"/><text x="${l - 7}" y="${pos + 4}" text-anchor="end" font-size="12" fill="#8ba09d">${Math.round(v / 100).toLocaleString("ru-RU")}</text>`;
+      grid += `<line x1="${l}" x2="${w - r}" y1="${pos}" y2="${pos}" stroke="#e4ebe8"/><text x="${l - 7}" y="${pos + 4}" text-anchor="end" font-size="12" fill="#8ba09d">${axisFormat.format(v / 100)}</text>`;
     }
     const zero = y(0);
     const a = days[0],
@@ -205,6 +210,13 @@
     $("chart").innerHTML =
       `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Прогноз от ${labelDate(a.date)} до ${labelDate(z.date)}"><rect x="${l}" y="${zero}" width="${w - l - r}" height="${Math.max(0, h - b - zero)}" fill="#fff2ed"/>${grid}<line x1="${l}" x2="${w - r}" y1="${zero}" y2="${zero}" stroke="#cba79c" stroke-dasharray="4 4"/><polyline points="${coords}" fill="none" stroke="#277c6c" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><text x="${l}" y="${h - 6}" font-size="12" fill="#8ba09d">${labelDate(a.date)}</text><text x="${w - r}" y="${h - 6}" font-size="12" fill="#8ba09d" text-anchor="end">${labelDate(z.date)}</text></svg>`;
   }
+  let chartFrame;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(chartFrame);
+    chartFrame = requestAnimationFrame(() => {
+      if (!$("overview").hidden && current) chart(current.daily);
+    });
+  });
   function overview() {
     const p = recalculation();
     if (!p) return;
@@ -217,12 +229,12 @@
     $("needed").textContent = fmt(p.needed);
     $("needed").classList.toggle("negative", p.needed > 0);
     $("gap-date").textContent = p.firstNegative
-      ? "Первый дефицит: " + labelDate(p.firstNegative)
-      : "Разрывов не обнаружено";
+      ? "Первый минус: " + labelDate(p.firstNegative)
+      : "По плану денег хватает";
     $("notice").className = "notice" + (p.needed ? " risk" : "");
     $("notice").textContent = p.needed
-      ? `Прогнозируется недостаток средств ${fmt(p.needed)}. Первый отрицательный дневной остаток — ${labelDate(p.firstNegative)}. Дней с дефицитом: ${p.daysNegative}. Для предотвращения всех отрицательных дневных остатков потребуется дополнительно ${fmt(p.needed)} до возникновения дефицита (если остальные операции не изменятся).`
-      : `По известным операциям на следующие ${horizon} дней отрицательного дневного остатка нет. Неучтённые расходы и задержки доходов могут изменить результат.`;
+      ? `По плану с ${labelDate(p.firstNegative)} не хватает денег. Нужно ещё ${fmt(p.needed)}, чтобы пройти весь период без минуса.`
+      : `По плану на ${horizon} дней денег хватает. Проверьте, что добавили все расходы и доходы.`;
     chart(p.daily);
     obligations();
     let arr = p.events.filter((e) => e.type !== "transfer").slice(0, 8);
@@ -246,7 +258,7 @@
         ? "До основного дохода " + labelDate(x.until)
         : "На 30 дней · основной доход не указан";
       $("obligations-summary").innerHTML =
-        `<div>Нужно оставить<strong>${fmt(x.reserve)}</strong></div><div>Доступно сверх резерва<strong>${fmt(x.available)}</strong></div><div>Не хватает на платежи<strong class="${x.shortfall ? "negative" : ""}">${fmt(x.shortfall)}</strong></div>`;
+        `<div>Нужно оставить<strong>${fmt(x.reserve)}</strong></div><div>Остаётся после платежей<strong>${fmt(x.available)}</strong></div><div>Не хватает на платежи<strong class="${x.shortfall ? "negative" : ""}">${fmt(x.shortfall)}</strong></div>`;
       $("obligations-list").innerHTML =
         x.items
           .map(
@@ -284,7 +296,9 @@
               `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}${["expense", "repay"].includes(e.type) && (e.required ?? true) ? " · обязательный" : ""}</div><div class="entry-note">${planFact(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-fact="${escape(e.id)}" ${e.paid ? "disabled" : ""}>Факт</button><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
           )
           .join("")
-      : '<div class="empty">Операций пока нет. Нажмите «+ Операция».</div>';
+      : query || filter !== "all"
+        ? '<div class="empty">Ничего не найдено. Измените поиск или выберите другой тип.</div>'
+        : '<div class="empty">Операций пока нет. Нажмите «+ Операция».</div>';
   }
   function calendar() {
     const p = recalculation();
