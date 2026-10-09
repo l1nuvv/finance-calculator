@@ -19,9 +19,9 @@
       this.timer = setInterval(() => {
         if (!document.hidden && this.active) this.flush();
       }, 10000);
-      window.addEventListener("online", () => this.flush());
+      window.addEventListener("online", () => this.retry());
       window.addEventListener("focus", () => {
-        if (this.active) this.flush();
+        this.retry();
       });
       window.addEventListener("beforeunload", (event) => {
         if (this.active && this.dirty()) {
@@ -33,6 +33,10 @@
     }
     dirty() {
       return this.active && !S.equal(this.base, this.getData());
+    }
+    retry() {
+      if (this.active) return this.flush();
+      if (this.client.user) return this.run(() => this.connect());
     }
     status(message, error = false) {
       $("cloud-status").textContent = message;
@@ -78,7 +82,13 @@
       try {
         await fn();
       } catch (error) {
-        this.status(error.message, true);
+        const message =
+          error.name === "TypeError"
+            ? "Нет связи с облаком. Проверьте сеть и повторите подключение."
+            : error.name === "TimeoutError"
+              ? "Облако не ответило вовремя. Изменения ждут отправки."
+              : error.message;
+        this.status(message, true);
       } finally {
         this.busy = false;
         this.render();
@@ -121,7 +131,12 @@
       this.revision = remote.revision;
       this.base = cached?.base || data;
       this.onData(cached?.local || data);
-      await this.reconcile(remote);
+      if (await this.reconcile(remote))
+        this.status(
+          this.dirty()
+            ? "Есть изменения · ожидают синхронизации"
+            : "Общий бюджет · синхронизирован",
+        );
       this.render();
     }
     async reconcile(remote, choices = {}) {
@@ -243,6 +258,7 @@
         : "";
       $("cloud-setup").hidden = !signedIn || this.active;
       $("cloud-connected").hidden = !this.active;
+      $("cloud-reconnect").hidden = this.active;
       $("cloud-members").textContent = this.active
         ? `Участников: ${this.remote.members} из 2`
         : "";
@@ -323,6 +339,7 @@
         }
       };
       $("sync-now").onclick = () => this.flush();
+      $("cloud-reconnect").onclick = () => this.retry();
       $("signout").onclick = async () => {
         if (this.dirty()) {
           await this.flush();

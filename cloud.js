@@ -12,6 +12,14 @@
           sessionStorage.getItem("kontur:session") || "null",
         );
       } catch {}
+      if (
+        this.session &&
+        (typeof this.session.user?.id !== "string" ||
+          typeof this.session.user?.email !== "string" ||
+          typeof this.session.access_token !== "string" ||
+          typeof this.session.refresh_token !== "string")
+      )
+        this.session = null;
     }
     get user() {
       return this.session?.user ?? null;
@@ -43,7 +51,8 @@
         const code = data?.error_code || data?.code;
         const messages = {
           invalid_credentials: "Неверный логин или пароль",
-          email_not_confirmed: "Аккаунт ещё не активирован. Обратитесь к владельцу приложения.",
+          email_not_confirmed:
+            "Аккаунт ещё не активирован. Обратитесь к владельцу приложения.",
           P0001: data?.message,
           23505: "Вы уже подключены к бюджету",
           42501: "Нет доступа к этому бюджету",
@@ -76,7 +85,12 @@
           })
           .catch((error) => {
             // Invalid refresh credentials require a fresh login; network errors keep the session.
-            if (/refresh token|invalid grant|session not found/i.test(error.message)) this.remember(null);
+            if (
+              /refresh token|invalid grant|session not found/i.test(
+                error.message,
+              )
+            )
+              this.remember(null);
             throw error;
           })
           .finally(() => {

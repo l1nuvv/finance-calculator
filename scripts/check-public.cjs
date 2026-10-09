@@ -48,6 +48,11 @@ assert.match(config, /supabaseKey:\s*["']sb_publishable_[A-Za-z0-9_-]+["']/);
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.ok(html.includes("Content-Security-Policy"));
 assert.ok(!/\son\w+=/i.test(html));
+const passwordField = html.match(/<input\s+[^>]*id="auth-password"[^>]*>/)?.[0];
+assert.ok(
+  passwordField && !passwordField.includes("minlength"),
+  "Login must accept provider-valid existing passwords",
+);
 console.log(
   `Public file checks passed (${files.length} files, no private exports, emails or secret keys)`,
 );
