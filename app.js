@@ -175,41 +175,142 @@
       return null;
     }
   }
-  function chart(days) {
-    const w = Math.max(300, $("chart").clientWidth),
-      h = 250,
-      l = 66,
-      r = 16,
-      t = 16,
-      b = 35,
-      vals = [0, ...days.map((x) => x.closing)],
-      min = Math.min(...vals),
-      max = Math.max(...vals),
-      pad = Math.max(100, Math.round((max - min) * 0.1)),
-      lower = min - pad,
-      upper = max + pad,
-      x = (i) => l + (i * (w - l - r)) / Math.max(1, days.length - 1),
-      y = (v) => t + ((upper - v) / (upper - lower)) * (h - t - b);
-    const coords = days
-      .map((d, i) => `${x(i).toFixed(2)},${y(d.closing).toFixed(2)}`)
-      .join(" ");
-    const axisFormat = new Intl.NumberFormat("ru-RU", {
-      notation: max - min >= 100000000 ? "compact" : "standard",
-      maximumFractionDigits:
-        max - min >= 100000000 ? 1 : max - min < 1000 ? 2 : 0,
+  let chartDate = null;
+  function fullDate(d) {
+    return new Date(d + "T12:00:00Z").toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
     });
-    let grid = "";
-    for (let i = 0; i <= 4; i++) {
-      const v = lower + ((upper - lower) * i) / 4,
-        pos = y(v);
-      grid += `<line x1="${l}" x2="${w - r}" y1="${pos}" y2="${pos}" stroke="#e4ebe8"/><text x="${l - 7}" y="${pos + 4}" text-anchor="end" font-size="12" fill="#8ba09d">${axisFormat.format(v / 100)}</text>`;
-    }
-    const zero = y(0);
-    const a = days[0],
-      z = days[days.length - 1];
-    $("chart").innerHTML =
-      `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Прогноз от ${labelDate(a.date)} до ${labelDate(z.date)}"><rect x="${l}" y="${zero}" width="${w - l - r}" height="${Math.max(0, h - b - zero)}" fill="#fff2ed"/>${grid}<line x1="${l}" x2="${w - r}" y1="${zero}" y2="${zero}" stroke="#cba79c" stroke-dasharray="4 4"/><polyline points="${coords}" fill="none" stroke="#277c6c" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><text x="${l}" y="${h - 6}" font-size="12" fill="#8ba09d">${labelDate(a.date)}</text><text x="${w - r}" y="${h - 6}" font-size="12" fill="#8ba09d" text-anchor="end">${labelDate(z.date)}</text></svg>`;
   }
+  function chart(days) {
+    const w = Math.max(240, $("chart").clientWidth),
+      h = 260,
+      l = 66,
+      r = 18,
+      t = 20,
+      b = 36;
+    const bounds = KonturChart.scale(days.map((d) => d.closing));
+    const x = (i) => l + (i * (w - l - r)) / Math.max(1, days.length - 1);
+    const y = (v) =>
+      t + ((bounds.upper - v) / (bounds.upper - bounds.lower)) * (h - t - b);
+    const index = Math.max(
+      0,
+      days.findIndex((d) => d.date === (chartDate || today())),
+    );
+    chartDate = days[index].date;
+    const axis = new Intl.NumberFormat("ru-RU", {
+      notation:
+        Math.max(Math.abs(bounds.lower), Math.abs(bounds.upper)) >= 100000000
+          ? "compact"
+          : "standard",
+      maximumFractionDigits: bounds.step < 100 ? 2 : 1,
+    });
+    const grid = bounds.ticks
+      .map(
+        (v) =>
+          `<line class="chart-grid${v === 0 ? " chart-zero" : ""}" x1="${l}" x2="${w - r}" y1="${y(v)}" y2="${y(v)}"/><text x="${l - 9}" y="${y(v) + 4}" text-anchor="end" font-size="11">${axis.format(v / 100)}</text>`,
+      )
+      .join("");
+    const dates = KonturChart.dates(days.length, w - l - r)
+      .map(
+        (i) =>
+          `<line class="chart-date-grid" x1="${x(i)}" x2="${x(i)}" y1="${t}" y2="${h - b}"/><text x="${x(i)}" y="${h - 9}" font-size="11" text-anchor="${i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"}">${labelDate(days[i].date)}</text>`,
+      )
+      .join("");
+    const coords = days.map((d, i) => `${x(i)},${y(d.closing)}`).join(" ");
+    const dots = days
+      .map((d, i) =>
+        d.events.length
+          ? `<circle class="chart-event-dot" cx="${x(i)}" cy="${y(d.closing)}" r="3"/>`
+          : "",
+      )
+      .join("");
+    const zero = y(0);
+    $("chart").innerHTML =
+      `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Прогноз денег с ${fullDate(days[0].date)} по ${fullDate(days.at(-1).date)} Выберите день с помощью поля даты или ползунка под графиком.">${bounds.lower < 0 ? `<rect x="${l}" y="${zero}" width="${w - l - r}" height="${h - b - zero}"/>` : ""}${grid}${dates}<polyline points="${coords}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>${dots}<line id="chart-cursor" class="chart-cursor" x1="${x(index)}" x2="${x(index)}" y1="${t}" y2="${h - b}"/><circle id="chart-selected" class="chart-selected" cx="${x(index)}" cy="${y(days[index].closing)}" r="5"/></svg>`;
+    const select = (i) => {
+      if (chartDate === days[i].date) return;
+      chartDate = days[i].date;
+      $("chart-cursor").setAttribute("x1", x(i));
+      $("chart-cursor").setAttribute("x2", x(i));
+      $("chart-selected").setAttribute("cx", x(i));
+      $("chart-selected").setAttribute("cy", y(days[i].closing));
+      chartDetail(days, i);
+    };
+    const pointer = (e) => {
+      const svg = $("chart").querySelector("svg"),
+        rect = svg.getBoundingClientRect();
+      select(
+        KonturChart.nearest(
+          ((e.clientX - rect.left) * w) / rect.width,
+          l,
+          w - r,
+          days.length,
+        ),
+      );
+    };
+    $("chart").onpointerdown = pointer;
+    $("chart").onpointermove = (e) => {
+      if (e.pointerType === "mouse" && !e.buttons) pointer(e);
+    };
+    $("chart-day").max = days.length - 1;
+    $("chart-day").oninput = (e) => select(Number(e.target.value));
+    $("chart-date").min = days[0].date;
+    $("chart-date").max = days.at(-1).date;
+    $("chart-date").onchange = (e) => {
+      const i = days.findIndex((d) => d.date === e.target.value);
+      if (i >= 0) select(i);
+      else e.target.value = chartDate;
+    };
+    $("chart-prev").onclick = () =>
+      select(Math.max(0, days.findIndex((d) => d.date === chartDate) - 1));
+    $("chart-next").onclick = () =>
+      select(
+        Math.min(
+          days.length - 1,
+          days.findIndex((d) => d.date === chartDate) + 1,
+        ),
+      );
+    chartDetail(days, index);
+  }
+  function chartDetail(days, index) {
+    const day = days[index];
+    $("chart-day").value = index;
+    $("chart-day").setAttribute(
+      "aria-valuetext",
+      `${fullDate(day.date)}: ${fmt(day.closing)}`,
+    );
+    $("chart-date").value = day.date;
+    $("chart-prev").disabled = index === 0;
+    $("chart-next").disabled = index === days.length - 1;
+    $("chart-detail").innerHTML =
+      `<div class="chart-day-heading"><div><strong>${fullDate(day.date)}</strong><span>После платежей этого дня</span></div><strong class="${day.closing < 0 ? "negative" : ""}">${fmt(day.closing)}</strong></div><div class="chart-day-opening">До платежей: ${fmt(day.opening)}</div>${day.events.length ? day.events.map((e) => `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${e.actual ? "Уже отмечено через «Факт»" : "Запланировано"} · ${category(e)}</div></div><span class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</span></div>`).join("") : '<p class="empty">На этот день платежей нет — сумма не меняется.</p>'}`;
+  }
+  function actualBalance() {
+    try {
+      const a = E.balanceNow(state, today());
+      $("balance-now").textContent = a.balance === null ? "—" : fmt(a.balance);
+      $("balance-now").classList.toggle(
+        "negative",
+        a.balance !== null && a.balance < 0,
+      );
+      $("balance-now-note").textContent =
+        a.balance === null
+          ? "Начальная дата ещё не наступила"
+          : `На ${labelDate(a.date)} · только отмеченные платежи`;
+      $("balance-calculation").innerHTML =
+        a.balance === null
+          ? `<p>Вы указали деньги на будущую дату ${fullDate(a.start)}. Для баланса на сегодня задайте начальную сумму и дату не позже сегодняшней.</p>`
+          : `<div class="balance-equation"><div>На начало ${labelDate(a.start)}<strong>${fmt(state.balance)}</strong></div><div>Уже пришло<strong class="positive">${a.received ? "+" : ""}${fmt(a.received)}</strong></div><div>Уже потрачено<strong>${a.spent ? "−" : ""}${fmt(a.spent)}</strong></div><div>Баланс сейчас<strong>${fmt(a.balance)}</strong></div></div>${a.events.map((e) => `<div class="entry"><div>${escape(e.name)}<div class="entry-note">${labelDate(e.date)} · уже отмечено через «Факт»</div></div><span class="entry-value">${sign(e)}${fmt(e.cents)}</span></div>`).join("")}`;
+    } catch (e) {
+      $("balance-now").textContent = "—";
+      $("balance-now-note").textContent = "Проверьте данные";
+      $("balance-calculation").textContent = e.message;
+    }
+  }
+
   let chartFrame;
   window.addEventListener("resize", () => {
     cancelAnimationFrame(chartFrame);
@@ -221,6 +322,7 @@
     const p = recalculation();
     if (!p) return;
     $("current").textContent = fmt(state.balance);
+    actualBalance();
     $("minimum").textContent = fmt(p.min);
     $("minimum").classList.toggle("negative", p.min < 0);
     $("min-date").textContent = "Минимум: " + labelDate(p.minimumDate);

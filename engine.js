@@ -421,6 +421,41 @@
       ],
     });
   }
+  function balanceNow(data, asOf) {
+    data = valid(data);
+    date(asOf);
+    if (asOf < data.start)
+      return {
+        balance: null,
+        received: 0,
+        spent: 0,
+        events: [],
+        date: asOf,
+        start: data.start,
+      };
+    let balance = data.balance,
+      received = 0,
+      spent = 0;
+    const events = [];
+    for (const e of data.events) {
+      if (e.paid || e.type === "transfer") continue;
+      for (const f of e.actuals || []) {
+        if (f.date < data.start || f.date > asOf) continue;
+        if (["income", "borrow"].includes(e.type)) {
+          received = add(received, f.cents);
+          balance = add(balance, f.cents);
+        } else {
+          spent = add(spent, f.cents);
+          balance = add(balance, -f.cents);
+        }
+        events.push({ ...e, ...f, actual: true, sourceId: e.id });
+      }
+    }
+    events.sort(
+      (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+    );
+    return { balance, received, spent, events, date: asOf, start: data.start };
+  }
   function obligations(data, asOf) {
     data = valid(data);
     date(asOf);
@@ -448,16 +483,7 @@
         (e.required ?? true),
     );
     const reserve = items.reduce((n, e) => add(n, e.cents), 0);
-    const current = add(
-      p.daily[offset].opening,
-      p.events
-        .filter((e) => e.actual && e.date === from && e.type !== "transfer")
-        .reduce(
-          (n, e) =>
-            add(n, ["income", "borrow"].includes(e.type) ? e.cents : -e.cents),
-          0,
-        ),
-    );
+    const current = balanceNow(data, from).balance;
     const free = add(current, -reserve);
     return {
       from,
@@ -480,6 +506,7 @@
     occurrences,
     project,
     obligations,
+    balanceNow,
     undo,
     loan,
   };

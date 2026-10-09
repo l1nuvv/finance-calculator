@@ -1052,3 +1052,152 @@ th:first-child {
     scroll-behavior: auto !important;
   }
 }
+/* Readable daily forecast with a persistent selected-day receipt. */
+#chart {
+  height: 260px;
+}
+#chart .chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+#chart .chart-zero {
+  stroke: var(--muted);
+  stroke-dasharray: 4 4;
+}
+#chart .chart-date-grid {
+  stroke: var(--line);
+  opacity: 0.45;
+  stroke-dasharray: 2 5;
+}
+#chart .chart-cursor {
+  stroke: var(--positive);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+#chart .chart-event-dot {
+  fill: var(--surface);
+  stroke: var(--positive);
+  stroke-width: 1.5;
+}
+#chart .chart-selected {
+  fill: var(--positive);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.chart-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+.chart-controls button {
+  min-height: 44px;
+  padding: 0;
+  font-size: 20px;
+}
+.chart-controls label {
+  max-width: 240px;
+  justify-self: center;
+  width: 100%;
+}
+.chart-slider-label {
+  margin-top: 14px;
+  font-weight: 400;
+  font-size: 12px;
+}
+#chart-day {
+  accent-color: var(--accent);
+  padding: 0;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.chart-detail {
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.chart-day-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.chart-day-heading > div {
+  display: grid;
+  gap: 4px;
+}
+.chart-day-heading > strong {
+  font-size: 21px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.chart-day-heading span,
+.chart-day-opening {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-day-opening {
+  margin: 12px 0 4px;
+}
+.chart-detail .empty {
+  margin: 0;
+  padding: 12px 0;
+}
+.balance-breakdown {
+  margin: -4px 0 24px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  font-size: 13px;
+}
+.balance-breakdown summary {
+  cursor: pointer;
+  min-height: 40px;
+  padding: 8px 0;
+  color: var(--muted);
+}
+.balance-breakdown summary strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.balance-equation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+.balance-equation div {
+  color: var(--muted);
+  font-size: 12px;
+}
+.balance-equation strong {
+  color: var(--ink);
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .chart-controls {
+    gap: 8px;
+  }
+  .chart-day-heading > strong {
+    font-size: 20px;
+  }
+  .balance-equation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .balance-breakdown {
+    margin-bottom: 20px;
+  }
+  .chart-detail .entry {
+    flex-wrap: wrap;
+  }
+  .chart-detail .entry-value {
+    margin-left: auto;
+  }
+}

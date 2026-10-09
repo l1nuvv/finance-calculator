@@ -96,9 +96,9 @@
           <div id="notice" class="notice"></div>
           <div class="stats">
             <div class="stat focus">
-              <div>Начальный остаток</div>
-              <strong id="current">—</strong
-              ><small>Деньги на начало расчёта</small>
+              <div>Баланс сейчас</div>
+              <strong id="balance-now">—</strong
+              ><small id="balance-now-note">По отмеченным платежам</small>
             </div>
             <div class="stat">
               <div>Минимальный остаток</div>
@@ -113,16 +113,46 @@
               <strong id="needed">—</strong><small id="gap-date">—</small>
             </div>
           </div>
+          <details class="balance-breakdown">
+            <summary>
+              Как получился баланс · начальный остаток
+              <strong id="current">—</strong>
+            </summary>
+            <div id="balance-calculation"></div>
+            <p class="footnote">
+              Здесь только деньги, которые уже пришли или ушли и отмечены через
+              «Факт». Планы показаны в прогнозе ниже. Сайт не получает баланс из
+              банка.
+            </p>
+          </details>
           <div class="two">
             <article class="panel wide">
               <div class="panel-title">
-                <h2>Как меняется сумма денег</h2>
+                <h2>Прогноз по дням</h2>
                 <span>По дням · ₽</span>
               </div>
               <div id="chart"></div>
+              <div class="chart-controls">
+                <button id="chart-prev" aria-label="Предыдущий день">←</button>
+                <label
+                  >День на графике<input id="chart-date" type="date"
+                /></label>
+                <button id="chart-next" aria-label="Следующий день">→</button>
+              </div>
+              <label class="chart-slider-label"
+                >Выберите день<input
+                  id="chart-day"
+                  type="range"
+                  min="0"
+                  max="29"
+                  step="1"
+                  value="0"
+              /></label>
+              <div id="chart-detail" class="chart-detail"></div>
               <div class="chart-info">
-                Сколько останется после платежей каждого дня. Если сумма ниже
-                нуля, денег не хватает.
+                Нажмите на график или выберите дату, чтобы увидеть сумму и
+                платежи этого дня. Линия показывает деньги после всех планов и
+                отмеченных платежей.
               </div>
             </article>
             <article class="panel">
@@ -142,7 +172,8 @@
             <div id="obligations-list" class="entries"></div>
             <p class="footnote">
               Эти деньги нужно оставить на важные платежи до зарплаты, включая
-              её день. Будущая зарплата здесь ещё не прибавлена.
+              её день. Будущая зарплата здесь ещё не прибавлена. Уже оплаченные
+              расходы отметьте через «Факт».
             </p>
           </article>
           <details class="panel comparison-panel">
@@ -377,10 +408,10 @@
             <div id="sync-conflicts" class="conflicts" hidden></div>
           </article>
           <article class="panel">
-            <h2>Исходные данные</h2>
+            <h2>Деньги на начало расчёта</h2>
             <div class="formgrid">
               <label
-                >Текущий остаток, ₽
+                >Начальный остаток, ₽
                 <input id="balance" type="number" step="0.01" /></label
               ><label
                 >Дата отсчёта <input id="setting-date" type="date"
@@ -568,16 +599,25 @@
                 можно также поставить «Вся операция уже учтена».
               </p>
               <p>
+                «Баланс сейчас» — начальная сумма плюс уже полученные деньги
+                минус уже потраченные. Учитываются только платежи, отмеченные
+                через «Факт», до сегодняшнего дня включительно. Будущие планы
+                сюда не входят.
+              </p>
+              <p>
                 «Минимальный остаток» — меньше всего денег, сколько будет за
                 выбранные дни. «В конце периода» — сколько останется в последний
                 день. «Не хватает» — сколько денег не хватает, чтобы не уйти в
                 минус.
               </p>
               <p>
-                Нажмите день в календаре, чтобы посмотреть платежи. Ежемесячный
-                платёж 31 числа в коротком месяце попадёт на последний день
-                месяца. Повторение «Дважды в месяц» ставит платежи на 10 и 25
-                числа, начиная с даты операции.
+                На графике нажмите нужное место, выберите дату или передвиньте
+                ползунок. Под ним появятся точная сумма и платежи выбранного
+                дня. Стрелками можно перейти на день назад или вперёд. Нажмите
+                день в календаре, чтобы посмотреть платежи. Ежемесячный платёж
+                31 числа в коротком месяце попадёт на последний день месяца.
+                Повторение «Дважды в месяц» ставит платежи на 10 и 25 числа,
+                начиная с даты операции.
               </p>
             </details>
             <details>
@@ -810,6 +850,7 @@
     <script src="sync-core.js" defer></script>
     <script src="cloud.js" defer></script>
     <script src="sync-controller.js" defer></script>
+    <script src="chart-core.js" defer></script>
     <script src="app.js" defer></script>
     <script src="help.js" defer></script>
     <script src="pwa.js" defer></script>

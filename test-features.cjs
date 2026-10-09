@@ -154,4 +154,78 @@ test("snapshot undo changes balance and date atomically", () => {
     }),
   );
 });
+
+test("current balance counts received loan facts but not future plans", () => {
+  const x = budget(
+    [
+      event("loan", "borrow", "2026-10-09", 1500000, {
+        actuals: [
+          { plannedDate: "2026-10-09", date: "2026-10-09", cents: 1500000 },
+        ],
+      }),
+      event("rent", "expense", "2026-10-15", 2000000),
+      event("salary", "income", "2026-10-25", 2800000),
+    ],
+    1000000,
+  );
+  const a = E.balanceNow(x, "2026-10-09");
+  assert.equal(a.balance, 2500000);
+  assert.equal(a.received, 1500000);
+  assert.equal(a.spent, 0);
+  assert.equal(a.events.length, 1);
+  assert.equal(E.obligations(x, "2026-10-09").current, a.balance);
+});
+test("current balance ignores old baseline facts, future facts, transfers and excluded operations", () => {
+  const x = budget([
+    event("old", "income", "2026-10-09", 1000, {
+      actuals: [{ plannedDate: "2026-10-09", date: "2026-10-08", cents: 1000 }],
+    }),
+    event("future", "income", "2026-10-10", 1000, {
+      actuals: [{ plannedDate: "2026-10-10", date: "2026-10-10", cents: 1000 }],
+    }),
+    event("transfer", "transfer", "2026-10-09", 1000, {
+      actuals: [{ plannedDate: "2026-10-09", date: "2026-10-09", cents: 1000 }],
+    }),
+    event("excluded", "expense", "2026-10-09", 1000, {
+      paid: true,
+      actuals: [{ plannedDate: "2026-10-09", date: "2026-10-09", cents: 1000 }],
+    }),
+    event("known", "income", "2026-10-09", 9000, { confidence: "actual" }),
+  ]);
+  assert.equal(E.balanceNow(x, "2026-10-09").balance, 10000);
+  assert.equal(E.balanceNow(x, "2026-10-08").balance, null);
+});
+test("current balance substitutes real recurring amounts and does not assume past plans happened", () => {
+  const x = budget([
+    event("rent", "expense", "2026-10-09", 3000, {
+      repeat: "monthly",
+      actuals: [{ plannedDate: "2026-10-09", date: "2026-10-10", cents: 2800 }],
+    }),
+    event("missed", "expense", "2026-10-09", 1000),
+    event("repay", "repay", "2026-10-11", 500, {
+      actuals: [{ plannedDate: "2026-10-11", date: "2026-10-11", cents: 500 }],
+    }),
+  ]);
+  const original = JSON.stringify(x),
+    a = E.balanceNow(x, "2026-11-10");
+  assert.equal(a.balance, 6700);
+  assert.equal(a.spent, 3300);
+  assert.equal(E.obligations(x, "2026-10-11").current, 6700);
+  assert.equal(JSON.stringify(x), original);
+});
+test("current balance rejects unsafe aggregates", () => {
+  const x = budget(
+    Array.from({ length: 5000 }, (_, i) =>
+      event("large" + i, "income", "2026-10-09", 1e12, {
+        repeat: "weekly",
+        actuals: [
+          { plannedDate: "2026-10-09", date: "2026-10-09", cents: 1e12 },
+          { plannedDate: "2026-10-16", date: "2026-10-16", cents: 1e12 },
+        ],
+      }),
+    ),
+    0,
+  );
+  assert.throws(() => E.balanceNow(x, "2026-10-16"), /точность/);
+});
 console.log(`${count} feature tests passed`);

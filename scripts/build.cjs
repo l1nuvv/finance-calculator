@@ -14,6 +14,7 @@ const files = [
   "sync-core.js",
   "cloud.js",
   "sync-controller.js",
+  "chart-core.js",
   "app.js",
   "help.js",
   "pwa.js",

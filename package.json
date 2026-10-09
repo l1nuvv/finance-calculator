@@ -5,7 +5,7 @@
   "description": "Shared financial planner with Supabase sync and GitHub Pages hosting",
   "scripts": {
     "start": "node scripts/serve.cjs",
-    "test": "node test.js && node test-sync.cjs && node test-controller.cjs && node test-features.cjs && node test-pwa.cjs && node scripts/check-public.cjs",
+    "test": "node test.js && node test-sync.cjs && node test-controller.cjs && node test-features.cjs && node test-chart.cjs && node test-pwa.cjs && node scripts/check-public.cjs",
     "build": "node scripts/build.cjs"
   },
   "engines": {
