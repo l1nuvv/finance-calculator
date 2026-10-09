@@ -37,35 +37,42 @@
           ><span>КОНТУР</span><small>бюджет для двоих</small>
         </div>
         <nav id="nav" aria-label="Разделы приложения">
-          <button data-tab="overview" class="selected">Обзор</button
+          <button data-tab="overview">Обзор</button
           ><button data-tab="operations">Операции</button
           ><button data-tab="calendar">Календарь</button
           ><button data-tab="debts">Долги</button
           ><button data-tab="history">История</button
           ><button data-tab="settings">Настройки</button
+          ><button data-tab="account" class="selected" aria-current="page">
+            Аккаунт</button
           ><button data-tab="help">Помощь</button>
         </nav>
         <div class="aside-foot">
           <strong id="storage-mode">Локальный бюджет</strong><br /><span
             id="storage-mode-note"
-            >Подключите синхронизацию в настройках</span
+            >Войдите в разделе «Аккаунт»</span
           >
         </div>
       </aside>
       <main class="content" id="main-content">
         <header class="top">
           <div>
-            <h1 id="heading">Обзор</h1>
+            <h1 id="heading">Вход в аккаунт</h1>
           </div>
           <div class="head-actions">
-            <span id="saved" class="muted" role="status" aria-live="polite"
+            <span
+              id="saved"
+              class="muted"
+              role="status"
+              aria-live="polite"
+              hidden
               >Данные на этом устройстве</span
             ><button id="theme-toggle" aria-label="Переключить тему">
               Тёмная тема</button
-            ><button id="add" class="primary">+ Операция</button>
+            ><button id="add" class="primary" hidden>+ Операция</button>
           </div>
         </header>
-        <section id="overview" class="tab">
+        <section id="overview" class="tab" hidden>
           <div class="toolbar">
             <label
               >Дата отсчёта
@@ -290,23 +297,7 @@
             </article>
           </div>
         </section>
-        <section id="settings" class="tab" hidden>
-          <article class="panel">
-            <h2>Приложение на телефоне</h2>
-            <button id="install-app" class="primary" hidden>
-              Установить Контур
-            </button>
-            <p id="install-note" class="muted">
-              Android: меню браузера → «Установить приложение» или «Добавить на
-              главный экран». iPhone: в Safari нажмите «Поделиться» → «На экран
-              Домой».
-            </p>
-            <p class="footnote">
-              После первого открытия интерфейс доступен без сети. Новый вход и
-              общая история требуют подключения. В открытой сессии
-              несинхронизированные правки сохраняются на устройстве.
-            </p>
-          </article>
+        <section id="account" class="tab">
           <article class="panel cloud-panel">
             <div class="panel-title">
               <h2>Общий бюджет для двоих</h2>
@@ -317,7 +308,7 @@
               создаёт общий бюджет и передаёт приглашение второму.
             </p>
             <p id="cloud-status" role="status" aria-live="polite">
-              Локальный режим · подключите общий бюджет
+              Войдите, чтобы открыть общий бюджет.
             </p>
             <form id="auth-form">
               <div class="formgrid">
@@ -350,6 +341,10 @@
               <p class="footnote">
                 Используйте выданные вам логин и пароль. Оба участника работают
                 с одним бюджетом после подключения по приглашению.
+              </p>
+              <p class="footnote">
+                Вход сохранится в этом браузере, даже если закрыть сайт.
+                Чтобы выйти из аккаунта, нажмите «Выйти».
               </p>
             </form>
             <div id="cloud-signed-in" hidden>
@@ -406,6 +401,24 @@
               </div>
             </div>
             <div id="sync-conflicts" class="conflicts" hidden></div>
+          </article>
+        </section>
+        <section id="settings" class="tab" hidden>
+          <article class="panel">
+            <h2>Приложение на телефоне</h2>
+            <button id="install-app" class="primary" hidden>
+              Установить Контур
+            </button>
+            <p id="install-note" class="muted">
+              Android: меню браузера → «Установить приложение» или «Добавить на
+              главный экран». iPhone: в Safari нажмите «Поделиться» → «На экран
+              Домой».
+            </p>
+            <p class="footnote">
+              После первого открытия интерфейс доступен без сети. Новый вход и
+              общая история требуют подключения. В открытой сессии
+              несинхронизированные правки сохраняются на устройстве.
+            </p>
           </article>
           <article class="panel">
             <h2>Деньги на начало расчёта</h2>
@@ -465,7 +478,7 @@
             </p>
             <ol>
               <li>
-                В «Данные и настройки» войдите со своим логином, чтобы открыть
+                В разделе «Аккаунт» войдите со своим логином, чтобы открыть
                 ваш общий бюджет.
               </li>
               <li>
@@ -661,7 +674,8 @@
               <p>
                 Если вы одновременно исправили одну операцию по-разному, сайт
                 попросит выбрать, какой вариант оставить. Это можно сделать в
-                настройках. Дата начала и начальная сумма выбираются вместе.
+                разделе «Аккаунт». Дата начала и начальная сумма выбираются
+                вместе.
               </p>
               <p>
                 Пропал интернет, когда вы уже вошли? Изменения сохранятся на

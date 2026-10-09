@@ -640,10 +640,12 @@ th:first-child {
 .history-entry > button {
   flex-shrink: 0;
 }
-#settings {
+#settings,
+#account {
   max-width: 860px;
 }
-#settings > .panel {
+#settings > .panel,
+#account > .panel {
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--line);

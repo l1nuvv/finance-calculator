@@ -4,11 +4,16 @@
     S = root.KonturSync,
     $ = (id) => document.getElementById(id);
   class SharedBudget {
-    constructor({ getData, onData, onLocal }) {
+    constructor({ getData, onData, onLocal, onAccount }) {
       this.client = new root.KonturCloud(root.KONTUR_CONFIG);
       this.getData = getData;
       this.onData = onData;
       this.onLocal = onLocal;
+      this.onAccount = onAccount;
+      this.client.onSessionChange = () => {
+        this.render();
+        if (!this.busy) this.retry();
+      };
       this.active = false;
       this.busy = false;
       this.base = null;
@@ -95,6 +100,7 @@
       }
     }
     async connect() {
+      this.status("Открываем общий бюджет…");
       if (this.active && this.activeUserId !== this.client.user.id) {
         this.active = false;
         this.base = null;
@@ -165,7 +171,7 @@
       this.remote = remote;
       this.conflicts = result.conflicts;
       if (this.conflicts.length) {
-        this.status("Конфликт правок: выберите версии в настройках.", true);
+        this.status("Конфликт правок: выберите версии в разделе «Аккаунт».", true);
         this.conflictRemote = remote;
         this.renderConflicts();
         return false;
@@ -268,6 +274,20 @@
     }
     render() {
       const signedIn = !!this.client.user;
+      const lostSession =
+        !!this.reportedUserId && this.reportedUserId !== this.client.user?.id;
+      if (lostSession) {
+        $("invite-result").hidden = true;
+        $("invite-output").value = "";
+      }
+      if (this.active && this.activeUserId !== this.client.user?.id) {
+        this.active = false;
+        this.base = null;
+        this.remote = null;
+        this.conflicts = [];
+        this.renderConflicts();
+        this.onLocal();
+      }
       $("auth-form").hidden = signedIn;
       $("cloud-signed-in").hidden = !signedIn;
       $("cloud-user").textContent = signedIn
@@ -292,8 +312,18 @@
         : "Локальный бюджет";
       $("storage-mode-note").textContent = this.active
         ? "Облако и копия на устройстве"
-        : "Подключите синхронизацию в настройках";
+        : "Войдите в разделе «Аккаунт»";
       document.body.classList.toggle("cloud-active", this.active);
+      const connected = this.active && !this.reportedActive;
+      this.reportedActive = this.active;
+      this.reportedUserId = this.client.user?.id;
+      this.onAccount?.({
+        signedIn,
+        active: this.active,
+        connected,
+        busy: this.busy,
+        lostSession,
+      });
     }
     bind() {
       $("auth-form").onsubmit = (event) => {

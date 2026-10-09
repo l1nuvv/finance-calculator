@@ -451,7 +451,10 @@
       history: "История изменений",
       help: "Помощь",
       settings: "Данные и настройки",
+      account: shared?.client.user ? "Аккаунт и общий бюджет" : "Вход в аккаунт",
     }[v];
+    $("add").hidden = v === "account";
+    $("saved").hidden = v === "account";
     draw();
   }
   function openEvent(e = {}, specified) {
@@ -872,7 +875,7 @@
   load();
   bind();
   sync();
-  tab("overview");
+  tab("account");
   shared = new SharedBudget({
     getData: () => state,
     onData: (data) => {
@@ -886,6 +889,17 @@
       sync();
       draw();
       $("saved").textContent = "Локальный бюджет";
+    },
+    onAccount: ({ signedIn, active, connected, busy, lostSession }) => {
+      const accountOpen = !$("account").hidden;
+      if (lostSession) tab("account");
+      else if (accountOpen && connected) tab("overview");
+      if (!$("account").hidden)
+        $("heading").textContent = signedIn
+          ? busy && !active
+            ? "Открываем общий бюджет…"
+            : "Аккаунт и общий бюджет"
+          : "Вход в аккаунт";
     },
   });
 })();
