@@ -1,0 +1,14 @@
+{
+  "name": "kontur-finance-calculator",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Shared financial planner with Supabase sync and GitHub Pages hosting",
+  "scripts": {
+    "start": "node scripts/serve.cjs",
+    "test": "node test.js && node test-sync.cjs && node test-controller.cjs && node scripts/check-public.cjs",
+    "build": "node scripts/build.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

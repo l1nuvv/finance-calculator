@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#175d53" />
+    <meta
+      name="description"
+      content="Контур — общий финансовый планировщик для двоих. Прогноз, операции и синхронизация между устройствами."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://riexltlejfjswlbfyhnm.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>Контур — финансовый планировщик</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Перейти к содержимому</a>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="mark">◈</span><span>КОНТУР</span
+          ><small>личные финансы</small>
+        </div>
+        <nav id="nav" aria-label="Разделы приложения">
+          <button data-tab="overview" class="selected">Обзор</button
+          ><button data-tab="operations">Операции</button
+          ><button data-tab="calendar">Календарь</button
+          ><button data-tab="debts">Кредиты и долги</button
+          ><button data-tab="settings">Данные и настройки</button>
+        </nav>
+        <div class="aside-foot">
+          <strong id="storage-mode">Локальный бюджет</strong><br /><span
+            id="storage-mode-note"
+            >Подключите синхронизацию в настройках</span
+          >
+        </div>
+      </aside>
+      <main class="content" id="main-content">
+        <header class="top">
+          <div>
+            <div class="eyebrow">ФИНАНСОВОЕ ПЛАНИРОВАНИЕ</div>
+            <h1 id="heading">Обзор</h1>
+          </div>
+          <div class="head-actions">
+            <span id="saved" class="muted" role="status" aria-live="polite"
+              >Данные на этом устройстве</span
+            ><button id="add" class="primary">+ Операция</button>
+          </div>
+        </header>
+        <section id="overview" class="tab">
+          <div class="toolbar">
+            <label
+              >Дата отсчёта
+              <input
+                id="start"
+                type="date"
+                readonly
+                title="Начальный остаток и его дата меняются вместе в настройках" /></label
+            ><label
+              >Период
+              <select id="period">
+                <option value="7">7 дней</option>
+                <option value="14">14 дней</option>
+                <option value="30" selected>30 дней</option>
+                <option value="60">60 дней</option>
+                <option value="90">90 дней</option>
+                <option value="180">180 дней</option>
+                <option value="365">Год</option>
+              </select></label
+            ><label
+              >Сценарий
+              <select id="scenario">
+                <option value="base">Базовый</option>
+                <option value="conservative">Консервативный</option>
+              </select></label
+            >
+          </div>
+          <div id="notice" class="notice"></div>
+          <div class="stats">
+            <div class="stat focus">
+              <div>Начальный остаток</div>
+              <strong id="current">—</strong
+              ><small>Средства на дату отсчёта</small>
+            </div>
+            <div class="stat">
+              <div>Минимальный остаток</div>
+              <strong id="minimum">—</strong><small id="min-date">—</small>
+            </div>
+            <div class="stat">
+              <div>В конце периода</div>
+              <strong id="ending">—</strong><small id="end-date">—</small>
+            </div>
+            <div class="stat">
+              <div>Необходимо покрыть</div>
+              <strong id="needed">—</strong><small id="gap-date">—</small>
+            </div>
+          </div>
+          <div class="two">
+            <article class="panel wide">
+              <div class="panel-title">
+                <h2>Прогноз денежных средств</h2>
+                <span>По дням · ₽</span>
+              </div>
+              <div id="chart"></div>
+              <div class="chart-info">
+                Значения включают операции, запланированные на соответствующий
+                день. Прогноз не гарантирует поступление средств.
+              </div>
+            </article>
+            <article class="panel">
+              <div class="panel-title">
+                <h2>Ближайшие операции</h2>
+                <span id="up-count"></span>
+              </div>
+              <div id="upcoming" class="entries"></div>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-title">
+              <h2>Быстрое сравнение</h2>
+              <span>Изменения не сохраняются в бюджете</span>
+            </div>
+            <div class="scenario-form">
+              <label
+                >Дополнительный заём, ₽
+                <input
+                  id="what-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="10000" /></label
+              ><label>Дата займа <input id="what-date" type="date" /></label
+              ><label>Дата возврата <input id="what-repay" type="date" /></label
+              ><button id="compare" class="primary">Сравнить</button>
+            </div>
+            <div id="comparison"></div>
+          </article>
+        </section>
+        <section id="operations" class="tab" hidden>
+          <article class="panel">
+            <div class="panel-title">
+              <h2>Запланированные операции</h2>
+              <span>Регулярные платежи создают прогнозные повторения</span>
+            </div>
+            <div class="ops-toolbar">
+              <label
+                >Поиск операций<input
+                  id="search-ops"
+                  type="search"
+                  placeholder="Название или категория" /></label
+              ><label
+                >Тип<select id="filter-ops">
+                  <option value="all">Все операции</option>
+                  <option value="income">Доходы</option>
+                  <option value="expense">Расходы</option>
+                  <option value="borrow">Займы</option>
+                  <option value="repay">Возврат долга</option>
+                  <option value="transfer">Переводы</option>
+                </select></label
+              >
+            </div>
+            <div id="ops" class="entries"></div>
+          </article>
+        </section>
+        <section id="calendar" class="tab" hidden>
+          <article class="panel">
+            <div class="panel-title">
+              <h2>Прогноз по датам</h2>
+              <span>Нажмите на строку, чтобы увидеть операции</span>
+            </div>
+            <div id="days"></div>
+          </article>
+        </section>
+        <section id="debts" class="tab" hidden>
+          <div class="two">
+            <article class="panel">
+              <h2>Кредитный калькулятор</h2>
+              <div class="formgrid">
+                <label
+                  >Тело кредита, ₽
+                  <input
+                    id="loan-p"
+                    type="number"
+                    min="0"
+                    value="200000" /></label
+                ><label
+                  >Ставка, % годовых
+                  <input
+                    id="loan-r"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="18" /></label
+                ><label
+                  >Срок, месяцев
+                  <input
+                    id="loan-n"
+                    type="number"
+                    min="1"
+                    max="600"
+                    value="24" /></label
+                ><label
+                  >Вид платежа
+                  <select id="loan-type">
+                    <option value="annuity">Аннуитетный</option>
+                    <option value="differentiated">Дифференцированный</option>
+                  </select></label
+                ><label
+                  >Доплата ежемесячно, ₽
+                  <input id="loan-extra" type="number" min="0" value="0"
+                /></label>
+              </div>
+              <button id="loan-calc" class="primary">Рассчитать</button>
+              <div id="loan-result"></div>
+            </article>
+            <article class="panel">
+              <h2>Долги и рассрочки</h2>
+              <p class="muted">
+                Добавьте операцию «Получение займа» и операцию «Возврат долга»
+                на соответствующие даты. Для рассрочки добавьте платёж с
+                ежемесячным повторением и датой окончания.
+              </p>
+              <div id="debt-summary"></div>
+              <p class="footnote">
+                Кредитная модель ориентировочная: равномерная месячная ставка,
+                начисление процентов на начало периода, округление до копеек.
+                Банковские правила могут отличаться.
+              </p>
+            </article>
+          </div>
+        </section>
+        <section id="settings" class="tab" hidden>
+          <article class="panel cloud-panel">
+            <div class="panel-title">
+              <h2>Общий бюджет для двоих</h2>
+              <span id="cloud-members"></span>
+            </div>
+            <p class="muted">
+              Войдите со своим логином на каждом устройстве. Один участник
+              создаёт общий бюджет и передаёт приглашение второму.
+            </p>
+            <p id="cloud-status" role="status" aria-live="polite">
+              Локальный режим · подключите общий бюджет
+            </p>
+            <form id="auth-form">
+              <div class="formgrid">
+                <label
+                  >Логин<input
+                    id="auth-login"
+                    type="text"
+                    autocomplete="username"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    pattern="[A-Za-z0-9_-]{3,32}"
+                    minlength="3"
+                    maxlength="32"
+                    required
+                    placeholder="Латинские буквы, цифры, _ или -" /></label
+                ><label
+                  >Пароль<input
+                    id="auth-password"
+                    type="password"
+                    autocomplete="current-password"
+                    minlength="8"
+                    maxlength="128"
+                    required
+                /></label>
+              </div>
+              <div class="actions">
+                <button class="primary" type="submit" data-cloud-action>
+                  Войти
+                </button>
+              </div>
+              <p class="footnote">
+                Используйте выданные вам логин и пароль. Оба участника работают
+                с одним бюджетом после подключения по приглашению.
+              </p>
+            </form>
+            <div id="cloud-signed-in" hidden>
+              <div class="actions">
+                <span id="cloud-user"></span
+                ><button id="signout" data-cloud-action>Выйти</button
+                ><button id="cloud-recovery">Копия для восстановления</button>
+              </div>
+              <div id="cloud-setup" hidden>
+                <hr />
+                <button id="cloud-create" class="primary" data-cloud-action>
+                  Создать общий бюджет из текущих данных
+                </button>
+                <p>
+                  Получили приглашение? Подключитесь к уже созданному бюджету.
+                </p>
+                <div class="invite-join">
+                  <label
+                    >Код приглашения<input
+                      id="invite-input"
+                      maxlength="64"
+                      autocomplete="off"
+                      spellcheck="false" /></label
+                  ><button id="cloud-join" data-cloud-action>
+                    Подключиться
+                  </button>
+                </div>
+              </div>
+              <div id="cloud-connected" hidden>
+                <hr />
+                <div class="actions">
+                  <button id="sync-now" class="primary" data-cloud-action>
+                    Синхронизировать сейчас</button
+                  ><button id="invite-button" data-cloud-action>
+                    Пригласить второго участника
+                  </button>
+                </div>
+                <div id="invite-result" hidden>
+                  <label
+                    >Одноразовый код · действует 7 дней<input
+                      id="invite-output"
+                      readonly
+                      aria-label="Код приглашения для второго участника" /></label
+                  ><button id="copy-invite">Скопировать код</button>
+                </div>
+                <p class="footnote">
+                  Обновления появляются в течение 10 секунд, при возвращении во
+                  вкладку и по кнопке. Без сети правки сохраняются в браузере и
+                  отправляются после подключения. При выходе ожидающие отправки
+                  правки должны быть синхронизированы.
+                </p>
+              </div>
+            </div>
+            <div id="sync-conflicts" class="conflicts" hidden></div>
+          </article>
+          <article class="panel">
+            <h2>Исходные данные</h2>
+            <div class="formgrid">
+              <label
+                >Текущий остаток, ₽
+                <input id="balance" type="number" step="0.01" /></label
+              ><label
+                >Дата отсчёта <input id="setting-date" type="date"
+              /></label>
+            </div>
+            <button id="apply" class="primary">Сохранить остаток</button>
+            <hr />
+            <h2>Резервное копирование</h2>
+            <p class="muted">
+              JSON-копия сохраняет текущий бюджет отдельно от облака. Импорт
+              заменяет данные открытого бюджета, включая общий бюджет, если он
+              подключён.
+            </p>
+            <div class="actions">
+              <button id="export">Скачать JSON</button
+              ><label class="filebutton"
+                >Загрузить JSON<input
+                  type="file"
+                  id="import"
+                  accept="application/json,.json"
+                  hidden /></label
+              ><button id="reset" class="danger">Очистить данные</button>
+            </div>
+            <button id="export-corrupt" hidden>
+              Скачать исходные данные для восстановления
+            </button>
+            <p id="storage-warning" class="footnote"></p>
+          </article>
+        </section>
+        <footer>
+          КОНТУР 2.0 · Финансовый планировщик для двоих · Все суммы в рублях
+        </footer>
+      </main>
+    </div>
+    <dialog id="dialog">
+      <form id="event-form">
+        <div class="dialoghead">
+          <h2 id="dialog-title">Новая операция</h2>
+          <button
+            type="button"
+            id="close"
+            class="iconbutton"
+            aria-label="Закрыть окно"
+          >
+            ×
+          </button>
+        </div>
+        <input id="event-id" type="hidden" />
+        <div class="formgrid">
+          <label
+            >Название<input
+              id="event-name"
+              maxlength="150"
+              placeholder="Аренда квартиры"
+              required /></label
+          ><label
+            >Тип<select id="event-type">
+              <option value="expense">Расход</option>
+              <option value="income">Доход</option>
+              <option value="borrow">Получение займа</option>
+              <option value="repay">Возврат долга</option>
+              <option value="transfer">Перевод между своими счетами</option>
+            </select></label
+          ><label
+            >Сумма, ₽<input
+              id="event-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required /></label
+          ><label>Дата<input id="event-date" type="date" required /></label
+          ><label
+            >Повторение<select id="event-repeat">
+              <option value="once">Один раз</option>
+              <option value="weekly">Раз в неделю</option>
+              <option value="biweekly">Раз в 2 недели</option>
+              <option value="monthly">Каждый месяц</option>
+              <option value="twice">Дважды в месяц (10 и 25)</option>
+            </select></label
+          ><label
+            >Повторять до (необязательно)<input
+              id="event-end"
+              type="date" /></label
+          ><label
+            >Надёжность поступления<select id="event-confidence">
+              <option value="confirmed">Подтверждено / запланировано</option>
+              <option value="expected">Ожидается (можно исключить)</option>
+              <option value="actual">Уже известно точно</option>
+            </select></label
+          ><label
+            >Категория<input
+              id="event-category"
+              maxlength="40"
+              placeholder="Жильё, продукты..."
+          /></label>
+        </div>
+        <label class="check"
+          ><input id="event-paid" type="checkbox" /> Вся операция уже учтена
+          (все повторения исключены из прогноза)</label
+        >
+        <div class="dialogactions">
+          <button type="button" id="cancel">Отмена</button
+          ><button class="primary" type="submit">Сохранить операцию</button>
+        </div>
+        <p id="error" class="error"></p>
+      </form>
+    </dialog>
+    <script src="config.js" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="sync-core.js" defer></script>
+    <script src="cloud.js" defer></script>
+    <script src="sync-controller.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
