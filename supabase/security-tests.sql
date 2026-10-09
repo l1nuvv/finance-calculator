@@ -22,6 +22,16 @@ begin
   insert into auth.users(id) values(alice),(bob),(outsider);
   perform set_config('request.jwt.claim.sub',alice::text,true);
   budget := public.kontur_create(data); code := public.kontur_invite();
+  if has_function_privilege('authenticated','public.kontur_authored(jsonb,jsonb)','execute')
+    then raise exception 'TEST FAILED: direct authorship helper access'; end if;
+  result := public.kontur_authored(jsonb_set(data,'{events}',
+    '[{"id":"test-event","name":"Test","type":"expense","cents":100,"date":"2026-10-09","author":"forged_user"}]'::jsonb), null);
+  if result->'events'->0->>'author' <> 'participant' then raise exception 'TEST FAILED: spoofed new author'; end if;
+  result := public.kontur_authored(jsonb_set(result,'{events,0,author}','"forged_user"'),
+    jsonb_set(result,'{events,0,author}','"original_user"'));
+  if result->'events'->0->>'author' <> 'original_user' then raise exception 'TEST FAILED: original author replaced'; end if;
+  result := public.kontur_authored(result, jsonb_set(data,'{events}', (result->'events') #- '{0,author}'));
+  if result->'events'->0 ? 'author' then raise exception 'TEST FAILED: legacy author invented'; end if;
   if budget->>'revision' <> '1' or length(code) <> 64 then raise exception 'TEST FAILED: create or invite'; end if;
   perform set_config('request.jwt.claim.sub',outsider::text,true);
   if public.kontur_read() is not null then raise exception 'TEST FAILED: outsider can read'; end if;

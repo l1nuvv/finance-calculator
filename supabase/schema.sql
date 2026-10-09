@@ -57,6 +57,8 @@ begin
     if e ? 'category' and (jsonb_typeof(e->'category') <> 'string' or length(e->>'category') > 40)
       then raise exception 'Неверная категория'; end if;
     if e ? 'paid' and jsonb_typeof(e->'paid') <> 'boolean' then raise exception 'Неверный статус оплаты'; end if;
+    if e ? 'author' and (jsonb_typeof(e->'author') <> 'string' or e->>'author' !~ '^[a-z0-9_-]{3,32}$')
+      then raise exception 'Неверный автор операции'; end if;
     if e ? 'days' then
       if jsonb_typeof(e->'days') <> 'array' then raise exception 'Неверные дни'; end if;
       if jsonb_array_length(e->'days') not between 1 and 31 then raise exception 'Неверные дни'; end if;
@@ -68,6 +70,26 @@ begin
   end loop;
   if exists (select 1 from jsonb_array_elements(p_data->'events') x group by x->>'id' having count(*) > 1)
     then raise exception 'Повторяющийся ID операции'; end if;
+end $$;
+
+-- Authorship comes from the authenticated account, never from client input.
+-- Existing operations retain their original author, including unknown legacy authors.
+create or replace function public.kontur_authored(p_data jsonb, p_previous jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare result jsonb; login text;
+begin
+  if auth.uid() is null then raise insufficient_privilege; end if;
+  select lower(split_part(email, '@', 1)) into login from auth.users where id = auth.uid();
+  if login is null or login !~ '^[a-z0-9_-]{3,32}$' then login := 'participant'; end if;
+  select coalesce(jsonb_agg(
+    (e.value - 'author') || case
+      when old.value is null then jsonb_build_object('author', login)
+      when old.value ? 'author' then jsonb_build_object('author', old.value->'author')
+      else '{}'::jsonb end order by e.ordinality), '[]'::jsonb)
+  into result from jsonb_array_elements(p_data->'events') with ordinality e(value, ordinality)
+  left join jsonb_array_elements(coalesce(p_previous->'events', '[]'::jsonb)) old(value)
+    on old.value->>'id' = e.value->>'id';
+  return jsonb_set(p_data, '{events}', result);
 end $$;
 
 create or replace function public.kontur_read() returns jsonb
@@ -88,7 +110,7 @@ begin
   if auth.uid() is null then raise insufficient_privilege; end if;
   perform public.kontur_validate(p_data);
   if exists(select 1 from public.kontur_members where user_id = auth.uid()) then raise exception 'Вы уже подключены к бюджету'; end if;
-  insert into public.kontur_budgets(owner_id, data) values(auth.uid(), p_data) returning id into budget;
+  insert into public.kontur_budgets(owner_id, data) values(auth.uid(), public.kontur_authored(p_data, null)) returning id into budget;
   insert into public.kontur_members(user_id,budget_id) values(auth.uid(),budget);
   return public.kontur_read();
 end $$;
@@ -101,7 +123,7 @@ begin
   select budget_id into budget from public.kontur_members where user_id = auth.uid();
   if budget is null then raise insufficient_privilege; end if;
   perform public.kontur_validate(p_data);
-  update public.kontur_budgets set data = p_data, revision = revision + 1, updated_at = now()
+  update public.kontur_budgets set data = public.kontur_authored(p_data, data), revision = revision + 1, updated_at = now()
     where id = budget and revision = p_revision;
   get diagnostics affected = row_count;
   return jsonb_build_object('saved', affected = 1, 'budget', public.kontur_read());
@@ -143,7 +165,7 @@ begin
   return public.kontur_read();
 end $$;
 
-revoke all on function public.kontur_valid_date(text), public.kontur_validate(jsonb), public.kontur_read(),
+revoke all on function public.kontur_authored(jsonb,jsonb), public.kontur_valid_date(text), public.kontur_validate(jsonb), public.kontur_read(),
   public.kontur_create(jsonb), public.kontur_save(bigint,jsonb), public.kontur_invite(), public.kontur_join(text)
   from public, anon, authenticated;
 grant execute on function public.kontur_read(), public.kontur_create(jsonb), public.kontur_save(bigint,jsonb),

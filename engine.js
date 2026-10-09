@@ -98,7 +98,9 @@
         ) ||
         (e.category !== undefined &&
           (typeof e.category !== "string" || e.category.length > 40)) ||
-        (e.paid !== undefined && typeof e.paid !== "boolean")
+        (e.paid !== undefined && typeof e.paid !== "boolean") ||
+        (e.author !== undefined &&
+          (typeof e.author !== "string" || !/^[a-z0-9_-]{3,32}$/.test(e.author)))
       )
         throw Error("Некорректная операция или повторяющийся ID");
       ids.add(e.id);
@@ -131,6 +133,7 @@
           confidence: e.confidence ?? "confirmed",
           category: e.category ?? "",
           paid: e.paid ?? false,
+          ...(e.author !== undefined ? { author: e.author } : {}),
           ...(e.end !== undefined ? { end: e.end } : {}),
           ...(e.days !== undefined
             ? { days: [...new Set(e.days)].sort((a, b) => a - b) }

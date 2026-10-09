@@ -79,6 +79,17 @@ async function test(name, fn) {
   console.log("OK", name);
 }
 (async () => {
+  await test("server authorship is adopted after saving imported operations", async () => {
+    const db = server(), original = db.save;
+    db.save = (revision, data) => original(revision, {
+      ...data, events: data.events.map(item => ({ ...item, author: "test_user" }))
+    });
+    const c = await controller(db);
+    c.edit(state([event("imported")]));
+    await c.flush();
+    assert.equal(c.getData().events[0].author, "test_user");
+    assert.equal(c.dirty(), false);
+  });
   await test("two devices converge after simultaneous additions", async () => {
     const db = server(),
       a = await controller(db),

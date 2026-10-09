@@ -170,9 +170,7 @@
             const response = await this.client.save(this.revision, sent);
             if (response.saved) {
               this.base = sent;
-              this.revision = response.budget.revision;
-              this.remote = response.budget;
-              this.cache();
+              if (!(await this.reconcile(response.budget))) return;
             } else if (!(await this.reconcile(response.budget))) return;
           } else {
             const remote = await this.client.read();

@@ -183,10 +183,13 @@
       ? arr
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
           )
           .join("")
       : '<div class="empty">Добавьте ближайшую зарплату или платёж.</div>';
+  }
+  function authorLabel(e) {
+    return e.author ? "Добавил(а): " + escape(e.author) : "Автор не указан";
   }
   function operations() {
     const query = $("search-ops").value.trim().toLocaleLowerCase("ru-RU"),
@@ -196,7 +199,7 @@
         (e) =>
           (filter === "all" || e.type === filter) &&
           (!query ||
-            (e.name + " " + (e.category || ""))
+            (e.name + " " + (e.category || "") + " " + (e.author || ""))
               .toLocaleLowerCase("ru-RU")
               .includes(query)),
       )
@@ -205,7 +208,7 @@
       ? list
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
           )
           .join("")
       : '<div class="empty">Операций пока нет. Нажмите «+ Операция».</div>';
@@ -216,7 +219,7 @@
     $("days").innerHTML = p.daily
       .map(
         (x) =>
-          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
+          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
       )
       .join("");
   }
@@ -312,6 +315,10 @@
           "Операция изменилась на другом устройстве. Закройте окно и откройте её заново.",
         );
       const events = state.events.slice();
+      const author = idx >= 0
+        ? state.events[idx].author
+        : shared?.active ? shared.client.user.email.split("@")[0].toLowerCase() : undefined;
+      if (author !== undefined) e.author = author;
       if (idx < 0) events.push(e);
       else events[idx] = e;
       commit({ ...state, events });

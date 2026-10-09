@@ -224,4 +224,12 @@ test("invalid loan kind and excessive extra rejected", () => {
   assert.throws(() => E.loan(100, 100, 12, "unknown"));
   assert.throws(() => E.loan(100, 100, 12, "annuity", 1e13));
 });
+test("authorship survives normalization, export and recurring projections", () => {
+  const data = s(0, [e("a", "2026-10-09", 100, "income", { author: "test_user", repeat: "weekly" })]);
+  assert.equal(E.valid(JSON.parse(JSON.stringify(data))).events[0].author, "test_user");
+  assert.ok(E.project(data, 15).events.every(item => item.author === "test_user"));
+  assert.equal(E.valid(s(0, [e("old", "2026-10-09", 100)])).events[0].author, undefined);
+  for (const author of [null, {}, "<script>", "a".repeat(33)])
+    assert.throws(() => E.valid(s(0, [e("bad", "2026-10-09", 100, "expense", { author })])));
+});
 console.log(`${count} financial tests passed`);
