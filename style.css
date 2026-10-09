@@ -861,3 +861,78 @@ nav button[aria-current="page"] {
     scroll-behavior: auto !important;
   }
 }
+.label-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+}
+.check .help-button {
+  margin-left: auto;
+}
+.check input {
+  flex: 0 0 16px;
+}
+.field-help {
+  position: fixed;
+  z-index: 100;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(260px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #b5ceca;
+  border-radius: 9px;
+  background: #fff;
+  color: #20383d;
+  box-shadow: 0 8px 30px #102a3029;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+:root[data-theme="dark"] .field-help {
+  background: #244047;
+  color: #e2eeea;
+  border-color: #6c9990;
+}
+.help-intro p,
+.help-intro li,
+.help-topics p {
+  line-height: 1.75;
+}
+.help-intro li {
+  margin-bottom: 10px;
+}
+.help-topics details {
+  padding: 16px 0;
+  border-bottom: 1px solid #dce6e2;
+}
+.help-topics details:last-child {
+  border: 0;
+}
+.help-topics summary {
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1.6;
+}
+.help-topics summary:focus-visible {
+  outline: 2px solid #439a87;
+  outline-offset: 5px;
+}
+.help-topics details[open] summary {
+  margin-bottom: 10px;
+}
+:root[data-theme="dark"] .help-topics details {
+  border-color: #355056;
+}

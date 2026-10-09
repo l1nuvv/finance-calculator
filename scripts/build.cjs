@@ -15,6 +15,7 @@ const files = [
   "cloud.js",
   "sync-controller.js",
   "app.js",
+  "help.js",
   "pwa.js",
   "sw.js",
   "manifest.webmanifest",
