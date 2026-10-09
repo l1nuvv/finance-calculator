@@ -7,7 +7,10 @@
     readBlocked = false,
     corruptRaw = null,
     shared = null,
-    editingEvent = null;
+    editingEvent = null,
+    editingFact = null,
+    localHistory = [],
+    historyEpoch = 0;
   const today = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -18,6 +21,14 @@
     scenario = "base",
     current = null;
   function load() {
+    try {
+      localHistory = JSON.parse(
+        localStorage.getItem("kontur:history:v1") || "[]",
+      );
+      if (!Array.isArray(localHistory)) localHistory = [];
+    } catch {
+      localHistory = [];
+    }
     try {
       const v = localStorage.getItem(STORE);
       if (v) state = E.valid(JSON.parse(v));
@@ -54,13 +65,49 @@
     }
     storageMsg();
   }
-  function commit(next, recovering = false) {
+  function commit(next, recovering = false, undoOf = null) {
     if (readBlocked && !shared?.active && !recovering)
       throw Error(
         "Локальные данные повреждены. Скачайте исходную копию в настройках и восстановите через импорт.",
       );
     const checked = E.valid(next);
     E.project(checked, horizon, scenario);
+    if (!shared?.active) {
+      const changes = [];
+      const before = new Map(state.events.map((e) => [e.id, e])),
+        after = new Map(checked.events.map((e) => [e.id, e]));
+      for (const id of new Set([...before.keys(), ...after.keys()])) {
+        const a = before.get(id) || null,
+          b = after.get(id) || null;
+        if (JSON.stringify(a) !== JSON.stringify(b))
+          changes.push({
+            event_id: id,
+            before: a,
+            after: b,
+            action: !a ? "create" : !b ? "delete" : "update",
+          });
+      }
+      if (state.start !== checked.start || state.balance !== checked.balance)
+        changes.push({
+          event_id: null,
+          before: { start: state.start, balance: state.balance },
+          after: { start: checked.start, balance: checked.balance },
+          action: "snapshot",
+        });
+      localHistory = [
+        ...changes.map((c) => ({
+          ...c,
+          id: crypto.randomUUID(),
+          actor: "На этом устройстве",
+          undo_of: undoOf,
+          created_at: new Date().toISOString(),
+        })),
+        ...localHistory,
+      ].slice(0, 100);
+      try {
+        localStorage.setItem("kontur:history:v1", JSON.stringify(localHistory));
+      } catch {}
+    }
     state = checked;
     if (recovering) {
       readBlocked = false;
@@ -177,19 +224,45 @@
       ? `Прогнозируется недостаток средств ${fmt(p.needed)}. Первый отрицательный дневной остаток — ${labelDate(p.firstNegative)}. Дней с дефицитом: ${p.daysNegative}. Для предотвращения всех отрицательных дневных остатков потребуется дополнительно ${fmt(p.needed)} до возникновения дефицита (если остальные операции не изменятся).`
       : `По известным операциям на следующие ${horizon} дней отрицательного дневного остатка нет. Неучтённые расходы и задержки доходов могут изменить результат.`;
     chart(p.daily);
+    obligations();
     let arr = p.events.filter((e) => e.type !== "transfer").slice(0, 8);
     $("up-count").textContent = String(p.events.length) + " событий";
     $("upcoming").innerHTML = arr.length
       ? arr
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.actual ? "факт" : "план"} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
           )
           .join("")
       : '<div class="empty">Добавьте ближайшую зарплату или платёж.</div>';
   }
   function authorLabel(e) {
     return e.author ? "Добавил(а): " + escape(e.author) : "Автор не указан";
+  }
+  function obligations() {
+    try {
+      const x = E.obligations(state, today());
+      $("obligations-period").textContent = x.nextIncome
+        ? "До основного дохода " + labelDate(x.until)
+        : "На 30 дней · основной доход не указан";
+      $("obligations-summary").innerHTML =
+        `<div>Нужно оставить<strong>${fmt(x.reserve)}</strong></div><div>Доступно сверх резерва<strong>${fmt(x.available)}</strong></div><div>Не хватает на платежи<strong class="${x.shortfall ? "negative" : ""}">${fmt(x.shortfall)}</strong></div>`;
+      $("obligations-list").innerHTML =
+        x.items
+          .map(
+            (e) =>
+              `<div class="entry"><div>${escape(e.name)}<div class="entry-note">${labelDate(e.date)}</div></div><b>${fmt(e.cents)}</b></div>`,
+          )
+          .join("") ||
+        '<p class="empty">Обязательных платежей в этом периоде нет.</p>';
+    } catch (e) {
+      $("obligations-summary").textContent = e.message;
+      $("obligations-list").replaceChildren();
+    }
+  }
+  function planFact(e) {
+    const facts = e.actuals || [];
+    return `План: ${fmt(e.cents)}${facts.length ? " · Факт: " + facts.map((f) => `${labelDate(f.plannedDate)} → ${fmt(f.cents)} (${labelDate(f.date)})`).join("; ") : " · Факт не отмечен"}`;
   }
   function operations() {
     const query = $("search-ops").value.trim().toLocaleLowerCase("ru-RU"),
@@ -208,7 +281,7 @@
       ? list
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}${["expense", "repay"].includes(e.type) && (e.required ?? true) ? " · обязательный" : ""}</div><div class="entry-note">${planFact(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-fact="${escape(e.id)}" ${e.paid ? "disabled" : ""}>Факт</button><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
           )
           .join("")
       : '<div class="empty">Операций пока нет. Нажмите «+ Операция».</div>';
@@ -219,7 +292,7 @@
     $("days").innerHTML = p.daily
       .map(
         (x) =>
-          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
+          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "факт" : "план"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
       )
       .join("");
   }
@@ -244,22 +317,22 @@
     if (active === "operations") operations();
     if (active === "calendar") calendar();
     if (active === "debts") debt();
+    if (active === "history") history();
   }
   function tab(v) {
     document.querySelectorAll(".tab").forEach((n) => (n.hidden = n.id !== v));
-    document
-      .querySelectorAll("nav button")
-      .forEach((n) => {
-        const selected = n.dataset.tab === v;
-        n.classList.toggle("selected", selected);
-        if (selected) n.setAttribute("aria-current", "page");
-        else n.removeAttribute("aria-current");
-      });
+    document.querySelectorAll("nav button").forEach((n) => {
+      const selected = n.dataset.tab === v;
+      n.classList.toggle("selected", selected);
+      if (selected) n.setAttribute("aria-current", "page");
+      else n.removeAttribute("aria-current");
+    });
     $("heading").textContent = {
       overview: "Обзор",
       operations: "Операции",
       calendar: "Календарь",
       debts: "Кредиты и долги",
+      history: "История изменений",
       settings: "Данные и настройки",
     }[v];
     draw();
@@ -284,6 +357,9 @@
     $("event-confidence").value = e.confidence || "confirmed";
     $("event-category").value = e.category || "";
     $("event-paid").checked = !!e.paid;
+    $("event-required").checked =
+      e.required ?? ["expense", "repay"].includes(e.type || "expense");
+    $("event-salary").checked = e.salary ?? e.type === "income";
     $("dialog").showModal();
   }
   function saveEvent(ev) {
@@ -300,6 +376,8 @@
           confidence: $("event-confidence").value,
           category: $("event-category").value.trim(),
           paid: $("event-paid").checked,
+          required: $("event-required").checked,
+          salary: $("event-salary").checked,
         };
       if (!e.name) throw Error("Введите название");
       if (e.cents < 0) throw Error("Сумма должна быть неотрицательной");
@@ -315,10 +393,17 @@
           "Операция изменилась на другом устройстве. Закройте окно и откройте её заново.",
         );
       const events = state.events.slice();
-      const author = idx >= 0
-        ? state.events[idx].author
-        : shared?.active ? shared.client.user.email.split("@")[0].toLowerCase() : undefined;
+      const author =
+        idx >= 0
+          ? state.events[idx].author
+          : shared?.active
+            ? shared.client.user.email.split("@")[0].toLowerCase()
+            : undefined;
       if (author !== undefined) e.author = author;
+      if (idx >= 0 && state.events[idx].actuals)
+        e.actuals = state.events[idx].actuals;
+      if (idx >= 0 && e.repeat === "twice" && state.events[idx].days)
+        e.days = state.events[idx].days;
       if (idx < 0) events.push(e);
       else events[idx] = e;
       commit({ ...state, events });
@@ -377,7 +462,169 @@
       $("loan-result").textContent = e.message;
     }
   }
+  function openFact(item) {
+    editingFact = JSON.stringify(item);
+    $("fact-id").value = item.id;
+    $("fact-title").textContent = "Факт · " + item.name;
+    $("fact-error").textContent = "";
+    const dates = E.occurrences(item, state.start, E.shift(state.start, 729));
+    $("fact-planned").value =
+      dates.find(
+        (d) =>
+          d >= today() &&
+          !(item.actuals || []).some((f) => f.plannedDate === d),
+      ) || item.date;
+    fillFact();
+    $("fact-records").innerHTML = (item.actuals || [])
+      .map(
+        (f) =>
+          `<div class="entry"><button type="button" data-fact-date="${f.plannedDate}">${labelDate(f.plannedDate)} → ${labelDate(f.date)}</button><b>${fmt(f.cents)}</b></div>`,
+      )
+      .join("");
+    $("fact-dialog").showModal();
+  }
+  function fillFact() {
+    const item = state.events.find((e) => e.id === $("fact-id").value);
+    if (!item) return;
+    const f = (item.actuals || []).find(
+      (f) => f.plannedDate === $("fact-planned").value,
+    );
+    $("fact-date").value = f?.date || today();
+    $("fact-amount").value = ((f?.cents ?? item.cents) / 100).toFixed(2);
+  }
+  function saveFact(remove = false) {
+    try {
+      const item = state.events.find((e) => e.id === $("fact-id").value);
+      if (!item || JSON.stringify(item) !== editingFact)
+        throw Error("Операция изменилась. Откройте факт заново.");
+      const plannedDate = $("fact-planned").value;
+      const facts = (item.actuals || []).filter(
+        (f) => f.plannedDate !== plannedDate,
+      );
+      if (!remove)
+        facts.push({
+          plannedDate,
+          date: $("fact-date").value,
+          cents: E.money($("fact-amount").value),
+        });
+      const changed = { ...item, actuals: facts };
+      commit({
+        ...state,
+        events: state.events.map((e) => (e.id === item.id ? changed : e)),
+      });
+      $("fact-dialog").close();
+    } catch (e) {
+      $("fact-error").textContent = e.message;
+    }
+  }
+  async function history() {
+    const epoch = ++historyEpoch,
+      scope = shared?.active ? shared.cacheKey : "local";
+    $("history-list").replaceChildren();
+    $("history-status").textContent = "Загрузка истории…";
+    try {
+      const entries = shared?.active
+        ? await shared.client.history()
+        : localHistory;
+      if (
+        epoch !== historyEpoch ||
+        scope !== (shared?.active ? shared.cacheKey : "local")
+      )
+        return;
+      $("history-status").textContent = shared?.active
+        ? "Общая история · сохранённые изменения"
+        : "История на этом устройстве";
+      $("history-list").innerHTML =
+        entries
+          .map((e) => {
+            const label =
+              {
+                create: "Добавлена операция",
+                update: "Изменена операция",
+                delete: "Удалена операция",
+                snapshot: "Изменён остаток / дата",
+              }[e.action] || "Изменение";
+            const describe = (value) =>
+              !value
+                ? "Нет записи"
+                : e.event_id === null
+                  ? `${fmt(value.balance)} · ${labelDate(value.start)}`
+                  : `${escape(value.name)} · ${planFact(value)} · ${labelDate(value.date)} · ${category(value)} · ${escape(value.repeat || "once")} · ${value.paid ? "учтена в остатке" : "в расчёте"} · ${value.required === false ? "необязательная" : "обязательность по типу"}`;
+            return `<div class="entry history-entry"><div><div class="entry-title">${e.undo_of ? "Отмена: " : ""}${label}</div><div class="entry-note">${escape(e.actor)} · ${escape(new Date(e.created_at).toLocaleString("ru-RU"))}</div><div class="entry-note">Было: ${describe(e.before)}</div><div class="entry-note">Стало: ${describe(e.after)}</div></div><button data-undo="${escape(e.id)}">Отменить</button></div>`;
+          })
+          .join("") ||
+        '<p class="empty">История пока пуста. Новые изменения появятся здесь.</p>';
+      $("history-list").onclick = async (event) => {
+        const button = event.target.closest("[data-undo]");
+        if (!button) return;
+        const entry = entries.find((e) => e.id === button.dataset.undo);
+        try {
+          if (scope !== (shared?.active ? shared.cacheKey : "local"))
+            throw Error("Бюджет изменился. Обновите историю.");
+          if (shared?.active) {
+            if (shared.busy || shared.dirty() || shared.conflicts.length)
+              throw Error("Сначала дождитесь синхронизации текущих изменений.");
+            await shared.run(async () => {
+              const result = await shared.client.undo(
+                entry.id,
+                shared.revision,
+              );
+              if (!(await shared.reconcile(result.budget))) return;
+              if (!result.saved)
+                throw Error(
+                  "Бюджет изменился на другом устройстве. Проверьте историю и повторите отмену.",
+                );
+              shared.status("Изменение отменено · синхронизировано");
+            });
+          } else commit(E.undo(state, entry), false, entry.id);
+          await history();
+        } catch (e) {
+          $("history-status").textContent = e.message;
+        }
+      };
+    } catch (e) {
+      if (epoch === historyEpoch)
+        $("history-status").textContent =
+          "Не удалось загрузить историю: " + e.message;
+    }
+  }
+  function themeLabel() {
+    const dark = document.documentElement.dataset.theme === "dark";
+    $("theme-toggle").textContent = dark ? "Светлая тема" : "Тёмная тема";
+    $("theme-toggle").setAttribute("aria-pressed", String(dark));
+  }
   function bind() {
+    themeLabel();
+    $("theme-toggle").onclick = () => {
+      const theme =
+        document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = theme;
+      try {
+        localStorage.setItem("kontur:theme", theme);
+      } catch {}
+      themeLabel();
+    };
+    $("history-refresh").onclick = history;
+    $("fact-close").onclick = () => $("fact-dialog").close();
+    $("fact-planned").onchange = fillFact;
+    $("fact-form").onsubmit = (e) => {
+      e.preventDefault();
+      saveFact();
+    };
+    $("fact-remove").onclick = () => saveFact(true);
+    $("fact-records").onclick = (e) => {
+      const b = e.target.closest("[data-fact-date]");
+      if (b) {
+        $("fact-planned").value = b.dataset.factDate;
+        fillFact();
+      }
+    };
+    $("event-type").onchange = () => {
+      $("event-required").checked = ["expense", "repay"].includes(
+        $("event-type").value,
+      );
+      $("event-salary").checked = $("event-type").value === "income";
+    };
     document
       .querySelectorAll("nav button")
       .forEach((n) => n.addEventListener("click", () => tab(n.dataset.tab)));
@@ -455,7 +702,9 @@
         confirm(
           "Удалить все операции и баланс в открытом бюджете? Если подключено облако, данные удалятся у обоих участников.",
         ) &&
-        confirm("Точно удалить? Отменить действие невозможно.")
+        confirm(
+          "Точно очистить открытый бюджет? Изменения будут записаны в историю.",
+        )
       ) {
         try {
           commit(empty(), true);
@@ -465,12 +714,13 @@
       }
     };
     $("ops").onclick = (e) => {
-      const b = e.target.closest("[data-edit],[data-delete]");
+      const b = e.target.closest("[data-edit],[data-delete],[data-fact]");
       if (!b) return;
-      const id = b.dataset.edit || b.dataset.delete,
+      const id = b.dataset.edit || b.dataset.delete || b.dataset.fact,
         item = state.events.find((x) => x.id === id);
       if (!item) return;
-      if (b.dataset.edit) openEvent(item);
+      if (b.dataset.fact) openFact(item);
+      else if (b.dataset.edit) openEvent(item);
       else if (confirm("Удалить операцию «" + item.name + "»?")) {
         try {
           commit({ ...state, events: state.events.filter((x) => x.id !== id) });

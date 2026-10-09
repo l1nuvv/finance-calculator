@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#175d53" />
     <meta
       name="description"
@@ -16,6 +16,11 @@
     <meta name="referrer" content="no-referrer" />
     <title>Контур — финансовый планировщик</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="theme.js"></script>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <link rel="icon" href="icon-192.png" type="image/png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -30,6 +35,7 @@
           ><button data-tab="operations">Операции</button
           ><button data-tab="calendar">Календарь</button
           ><button data-tab="debts">Кредиты и долги</button
+          ><button data-tab="history">История изменений</button
           ><button data-tab="settings">Данные и настройки</button>
         </nav>
         <div class="aside-foot">
@@ -48,6 +54,8 @@
           <div class="head-actions">
             <span id="saved" class="muted" role="status" aria-live="polite"
               >Данные на этом устройстве</span
+            ><button id="theme-toggle" aria-label="Переключить тему">
+              Тёмная тема</button
             ><button id="add" class="primary">+ Операция</button>
           </div>
         </header>
@@ -99,6 +107,19 @@
               <strong id="needed">—</strong><small id="gap-date">—</small>
             </div>
           </div>
+          <article class="panel" id="obligations-panel">
+            <div class="panel-title">
+              <h2>Обязательные платежи</h2>
+              <span id="obligations-period"></span>
+            </div>
+            <div id="obligations-summary" class="loanmetrics"></div>
+            <div id="obligations-list" class="entries"></div>
+            <p class="footnote">
+              Резерв включает неоплаченные обязательные расходы, в том числе в
+              день дохода. Доступная сумма — ориентир по известным операциям;
+              будущие поступления в неё не включены.
+            </p>
+          </article>
           <div class="two">
             <article class="panel wide">
               <div class="panel-title">
@@ -143,7 +164,7 @@
         <section id="operations" class="tab" hidden>
           <article class="panel">
             <div class="panel-title">
-              <h2>Запланированные операции</h2>
+              <h2>Операции · план и факт</h2>
               <span>Регулярные платежи создают прогнозные повторения</span>
             </div>
             <div class="ops-toolbar">
@@ -234,6 +255,22 @@
           </div>
         </section>
         <section id="settings" class="tab" hidden>
+          <article class="panel">
+            <h2>Приложение на телефоне</h2>
+            <button id="install-app" class="primary" hidden>
+              Установить Контур
+            </button>
+            <p id="install-note" class="muted">
+              Android: меню браузера → «Установить приложение» или «Добавить на
+              главный экран». iPhone: в Safari нажмите «Поделиться» → «На экран
+              Домой».
+            </p>
+            <p class="footnote">
+              После первого открытия интерфейс доступен без сети. Новый вход и
+              общая история требуют подключения. В открытой сессии
+              несинхронизированные правки сохраняются на устройстве.
+            </p>
+          </article>
           <article class="panel cloud-panel">
             <div class="panel-title">
               <h2>Общий бюджет для двоих</h2>
@@ -368,8 +405,23 @@
             <p id="storage-warning" class="footnote"></p>
           </article>
         </section>
+        <section id="history" class="tab" hidden>
+          <article class="panel">
+            <div class="panel-title">
+              <h2>История изменений</h2>
+              <button id="history-refresh">Обновить</button>
+            </div>
+            <p class="footnote">
+              Последние 100 изменений, начиная с этого обновления. В общем
+              бюджете история общая. Отмена доступна, если запись с тех пор не
+              изменилась; сама отмена тоже попадёт в историю.
+            </p>
+            <p id="history-status" role="status"></p>
+            <div id="history-list" class="entries"></div>
+          </article>
+        </section>
         <footer>
-          КОНТУР 2.0 · Финансовый планировщик для двоих · Все суммы в рублях
+          КОНТУР 2.1 · Финансовый планировщик для двоих · Все суммы в рублях
         </footer>
       </main>
     </div>
@@ -403,7 +455,7 @@
               <option value="transfer">Перевод между своими счетами</option>
             </select></label
           ><label
-            >Сумма, ₽<input
+            >Плановая сумма, ₽<input
               id="event-amount"
               type="number"
               min="0"
@@ -436,6 +488,18 @@
           /></label>
         </div>
         <label class="check"
+          ><input id="event-required" type="checkbox" /> Обязательный расход /
+          платёж по долгу</label
+        >
+        <label class="check"
+          ><input id="event-salary" type="checkbox" /> Основной доход — ориентир
+          для резерва</label
+        >
+        <p class="footnote">
+          Фактическую сумму и дату отмечайте через «Факт» в списке операций. Для
+          повторяющейся операции факт относится только к выбранному платежу.
+        </p>
+        <label class="check"
           ><input id="event-paid" type="checkbox" /> Вся операция уже учтена
           (все повторения исключены из прогноза)</label
         >
@@ -446,11 +510,50 @@
         <p id="error" class="error"></p>
       </form>
     </dialog>
+    <dialog id="fact-dialog">
+      <form id="fact-form">
+        <div class="dialoghead">
+          <h2 id="fact-title">Фактический платёж</h2>
+          <button type="button" id="fact-close" aria-label="Закрыть факт">
+            ×
+          </button>
+        </div>
+        <input id="fact-id" type="hidden" />
+        <div class="formgrid">
+          <label
+            >Дата платежа по плану<input id="fact-planned" type="date" required
+          /></label>
+          <label
+            >Фактическая дата<input id="fact-date" type="date" required
+          /></label>
+          <label
+            >Фактическая сумма, ₽<input
+              id="fact-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+          /></label>
+        </div>
+        <p class="footnote">
+          Факт заменяет план этого платежа в расчёте. Если он уже включён в
+          начальный остаток, его фактическая дата должна быть раньше даты
+          отсчёта.
+        </p>
+        <div id="fact-records" class="entries"></div>
+        <p id="fact-error" class="error"></p>
+        <div class="dialogactions">
+          <button type="button" id="fact-remove">Убрать факт этой даты</button
+          ><button type="submit" class="primary">Сохранить факт</button>
+        </div>
+      </form>
+    </dialog>
     <script src="config.js" defer></script>
     <script src="engine.js" defer></script>
     <script src="sync-core.js" defer></script>
     <script src="cloud.js" defer></script>
     <script src="sync-controller.js" defer></script>
     <script src="app.js" defer></script>
+    <script src="pwa.js" defer></script>
   </body>
 </html>

@@ -123,6 +123,12 @@
     read() {
       return this.rpc("kontur_read");
     }
+    history() {
+      return this.rpc("kontur_history");
+    }
+    undo(id, revision) {
+      return this.rpc("kontur_undo", { p_history: id, p_revision: revision });
+    }
     create(data) {
       return this.rpc("kontur_create", { p_data: data });
     }

@@ -7,6 +7,8 @@ const types = {
   ".html": "text/html",
   ".css": "text/css",
   ".js": "text/javascript",
+  ".webmanifest": "application/manifest+json",
+  ".png": "image/png",
   ".sql": "text/plain",
   ".md": "text/plain",
 };

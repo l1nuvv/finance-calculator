@@ -100,7 +100,10 @@
           (typeof e.category !== "string" || e.category.length > 40)) ||
         (e.paid !== undefined && typeof e.paid !== "boolean") ||
         (e.author !== undefined &&
-          (typeof e.author !== "string" || !/^[a-z0-9_-]{3,32}$/.test(e.author)))
+          (typeof e.author !== "string" ||
+            !/^[a-z0-9_-]{3,32}$/.test(e.author))) ||
+        (e.required !== undefined && typeof e.required !== "boolean") ||
+        (e.salary !== undefined && typeof e.salary !== "boolean")
       )
         throw Error("Некорректная операция или повторяющийся ID");
       ids.add(e.id);
@@ -117,6 +120,27 @@
           e.days.some((n) => !Number.isInteger(n) || n < 1 || n > 31))
       )
         throw Error("Дни месяца недопустимы");
+      if (e.actuals !== undefined) {
+        if (!Array.isArray(e.actuals) || e.actuals.length > 730)
+          throw Error("Слишком много фактических платежей");
+        const seen = new Set();
+        for (const fact of e.actuals) {
+          if (
+            !fact ||
+            typeof fact !== "object" ||
+            seen.has(fact.plannedDate) ||
+            !Number.isSafeInteger(fact.cents) ||
+            fact.cents < 0 ||
+            fact.cents > MAX
+          )
+            throw Error("Некорректный фактический платёж");
+          date(fact.plannedDate);
+          date(fact.date);
+          if (!occurrences(e, fact.plannedDate, fact.plannedDate).length)
+            throw Error("Дата факта не соответствует повторению операции");
+          seen.add(fact.plannedDate);
+        }
+      }
     }
     return {
       version: 1,
@@ -134,6 +158,19 @@
           category: e.category ?? "",
           paid: e.paid ?? false,
           ...(e.author !== undefined ? { author: e.author } : {}),
+          ...(e.required !== undefined ? { required: e.required } : {}),
+          ...(e.salary !== undefined ? { salary: e.salary } : {}),
+          ...(e.actuals !== undefined
+            ? {
+                actuals: e.actuals
+                  .map((f) => ({
+                    plannedDate: f.plannedDate,
+                    date: f.date,
+                    cents: f.cents,
+                  }))
+                  .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate)),
+              }
+            : {}),
           ...(e.end !== undefined ? { end: e.end } : {}),
           ...(e.days !== undefined
             ? { days: [...new Set(e.days)].sort((a, b) => a - b) }
@@ -208,15 +245,36 @@
       events = [];
     const all = valid({ ...data, events: [...data.events, ...extras] }).events;
     for (const e of all) {
+      if (e.paid) continue;
+      const facts = new Map((e.actuals || []).map((f) => [f.plannedDate, f]));
+      for (const f of facts.values()) {
+        if (f.date >= start && f.date <= end)
+          events.push({
+            ...e,
+            date: f.date,
+            cents: f.cents,
+            plannedCents: e.cents,
+            plannedDate: f.plannedDate,
+            actual: true,
+            sourceId: e.id,
+          });
+      }
       if (
-        e.paid ||
-        (scenario === "conservative" &&
-          e.type === "income" &&
-          e.confidence === "expected")
+        scenario === "conservative" &&
+        e.type === "income" &&
+        e.confidence === "expected"
       )
         continue;
       for (const d of occurrences(e, start, end))
-        events.push({ ...e, date: d, sourceId: e.id });
+        if (!facts.has(d))
+          events.push({
+            ...e,
+            date: d,
+            plannedDate: d,
+            plannedCents: e.cents,
+            actual: false,
+            sourceId: e.id,
+          });
     }
     events.sort(
       (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
@@ -333,6 +391,85 @@
       monthly: schedule[0]?.payment || 0,
     };
   }
+  function undo(data, entry) {
+    data = valid(data);
+    if (entry.event_id === null) {
+      if (
+        JSON.stringify([data.start, data.balance]) !==
+        JSON.stringify([entry.after.start, entry.after.balance])
+      )
+        throw Error(
+          "Остаток или дата изменились после этой записи. Отмена остановлена.",
+        );
+      return valid({ ...data, ...entry.before });
+    }
+    const current = data.events.find((e) => e.id === entry.event_id) || null;
+    const canonical = (e) =>
+      e ? valid({ ...data, events: [e] }).events[0] : null;
+    if (
+      JSON.stringify(canonical(current)) !==
+      JSON.stringify(canonical(entry.after))
+    )
+      throw Error(
+        "Операция уже изменилась. Отмена остановлена, чтобы сохранить новые правки.",
+      );
+    return valid({
+      ...data,
+      events: [
+        ...data.events.filter((e) => e.id !== entry.event_id),
+        ...(entry.before ? [entry.before] : []),
+      ],
+    });
+  }
+  function obligations(data, asOf) {
+    data = valid(data);
+    date(asOf);
+    const from = asOf < data.start ? data.start : asOf;
+    const offset = Math.round((date(from) - date(data.start)) / DAY);
+    if (offset > 699)
+      throw Error(
+        "Обновите дату и остаток в настройках: дата отсчёта слишком далеко от сегодняшней.",
+      );
+    const p = project(data, Math.min(730, offset + 366));
+    const nextIncome = p.events.find(
+      (e) =>
+        e.date >= from &&
+        !e.actual &&
+        e.type === "income" &&
+        (e.salary ?? true),
+    );
+    const until = nextIncome?.date || shift(from, 29);
+    const items = p.events.filter(
+      (e) =>
+        !e.actual &&
+        e.date >= from &&
+        e.date <= until &&
+        ["expense", "repay"].includes(e.type) &&
+        (e.required ?? true),
+    );
+    const reserve = items.reduce((n, e) => add(n, e.cents), 0);
+    const current = add(
+      p.daily[offset].opening,
+      p.events
+        .filter((e) => e.actual && e.date === from && e.type !== "transfer")
+        .reduce(
+          (n, e) =>
+            add(n, ["income", "borrow"].includes(e.type) ? e.cents : -e.cents),
+          0,
+        ),
+    );
+    const free = add(current, -reserve);
+    return {
+      from,
+      until,
+      nextIncome,
+      items,
+      reserve,
+      current,
+      available: Math.max(0, free),
+      shortfall: Math.max(0, -free),
+    };
+  }
   return {
     money,
     amount,
@@ -342,6 +479,8 @@
     valid,
     occurrences,
     project,
+    obligations,
+    undo,
     loan,
   };
 });

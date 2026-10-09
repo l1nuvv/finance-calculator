@@ -79,6 +79,29 @@ async function test(name, fn) {
   console.log("OK", name);
 }
 (async () => {
+  await test("offline reopening restores only the signed-in user's cached budget", async () => {
+    const db = server(), c = await controller(db);
+    c.active = false;
+    db.user = { id:"test-user" };
+    db.read = async () => { throw new TypeError("offline"); };
+    const cacheKey = "kontur:cloud:v1:test-user:cached-budget";
+    context.localStorage = {
+      "kontur:cloud:v1:other-user:private-budget": "{}",
+      [cacheKey]: JSON.stringify({base:state(),local:state(),revision:3}),
+      getItem(key) { return this[key]; },
+    };
+    let adopted;
+    c.adopt = async remote => { adopted=remote; };
+    try {
+      await c.connect();
+      assert.equal(adopted.id,"cached-budget");
+      assert.equal(adopted.revision,3);
+      db.read=async()=>{throw Error("Access revoked");};
+      adopted=null;
+      await assert.rejects(()=>c.connect(),/Access revoked/);
+      assert.equal(adopted,null);
+    } finally { delete context.localStorage; }
+  });
   await test("server authorship is adopted after saving imported operations", async () => {
     const db = server(), original = db.save;
     db.save = (revision, data) => original(revision, {

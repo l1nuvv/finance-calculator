@@ -103,7 +103,26 @@
         this.renderConflicts();
         this.onLocal();
       }
-      const remote = await this.client.read();
+      let remote;
+      try {
+        remote = await this.client.read();
+      } catch (error) {
+        if (error.name !== "TypeError" && error.name !== "TimeoutError")
+          throw error;
+        const prefix = "kontur:cloud:v1:" + this.client.user.id + ":";
+        const key = Object.keys(localStorage).find((k) => k.startsWith(prefix));
+        if (!key) throw error;
+        const cached = JSON.parse(localStorage.getItem(key));
+        await this.adopt({
+          id: key.slice(prefix.length),
+          data: cached.base,
+          revision: cached.revision,
+          owner: false,
+          members: 2,
+        });
+        this.status("Без связи с облаком · открыта сохранённая копия", true);
+        return;
+      }
       if (remote) await this.adopt(remote);
       else this.status("Создайте общий бюджет или введите код приглашения.");
       this.render();

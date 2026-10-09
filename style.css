@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   font-family:
     Inter,
     ui-sans-serif,
@@ -10,6 +11,128 @@
   color: #182a32;
   background: #f6f8f7;
   font-synthesis: none;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e2eeea;
+  background: #101c21;
+}
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .stat,
+:root[data-theme="dark"] dialog {
+  background: #192c32;
+  color: #e2eeea;
+  border-color: #355056;
+}
+:root[data-theme="dark"] .stat.focus {
+  background: #1c4846;
+}
+:root[data-theme="dark"] button,
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .filebutton,
+:root[data-theme="dark"] .skip-link {
+  background: #20383e;
+  color: #e2eeea;
+  border-color: #486368;
+}
+:root[data-theme="dark"] nav button {
+  background: transparent;
+}
+:root[data-theme="dark"] nav button.selected {
+  background: #295759;
+}
+:root[data-theme="dark"] button.primary {
+  background: #216d5f;
+  border-color: #439a87;
+  color: #fff;
+}
+:root[data-theme="dark"] button.primary:hover {
+  background: #28816e;
+}
+:root[data-theme="dark"] .notice {
+  background: #1c3e37;
+  color: #b9e8d7;
+  border-color: #396657;
+}
+:root[data-theme="dark"] .notice.risk,
+:root[data-theme="dark"] .conflicts {
+  background: #48302d;
+  color: #ffd2bf;
+  border-color: #815146;
+}
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .entry-note,
+:root[data-theme="dark"] .footnote,
+:root[data-theme="dark"] .chart-info,
+:root[data-theme="dark"] .panel-title span,
+:root[data-theme="dark"] .stat div,
+:root[data-theme="dark"] .stat small,
+:root[data-theme="dark"] label,
+:root[data-theme="dark"] .toolbar label,
+:root[data-theme="dark"] .empty {
+  color: #a8c1bc;
+}
+:root[data-theme="dark"] .negative,
+:root[data-theme="dark"] .error,
+:root[data-theme="dark"] .danger {
+  color: #ffac99 !important;
+}
+:root[data-theme="dark"] .positive {
+  color: #7adeba;
+}
+:root[data-theme="dark"] .day > button {
+  background: #192c32;
+}
+:root[data-theme="dark"] .day > button:hover,
+:root[data-theme="dark"] .day .detail,
+:root[data-theme="dark"] #cloud-status,
+:root[data-theme="dark"] .loanmetrics div,
+:root[data-theme="dark"] #comparison .comp {
+  background: #233d41;
+}
+:root[data-theme="dark"] .entry,
+:root[data-theme="dark"] .day,
+:root[data-theme="dark"] td,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] .panel hr {
+  border-color: #355056;
+}
+:root[data-theme="dark"] #chart text {
+  fill: #b9d0c8;
+}
+:root[data-theme="dark"] #chart rect {
+  fill: #402b2c;
+}
+:root[data-theme="dark"] #chart line[stroke="#e4ebe8"] {
+  stroke: #355056;
+}
+:root[data-theme="dark"] #chart polyline {
+  stroke: #79dbb9;
+}
+:root[data-theme="dark"] input:focus,
+:root[data-theme="dark"] select:focus {
+  box-shadow: 0 0 0 2px #386c62;
+}
+.history-entry {
+  align-items: flex-start;
+}
+.history-entry .entry-note {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#obligations-list {
+  margin-top: 16px;
+  max-height: 280px;
+  overflow: auto;
+}
+.entry > div:first-child {
+  min-width: 0;
+}
+.entry-actions {
+  max-width: 46%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 * {
   box-sizing: border-box;

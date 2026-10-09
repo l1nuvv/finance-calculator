@@ -61,3 +61,59 @@ begin
 end $$;
 select 'PASS: RLS, anonymous/outsider denial, owner invite, two-member limit, injection input, validation, optimistic concurrency' as result;
 rollback;
+
+begin;
+do $$
+declare alice uuid := gen_random_uuid(); bob uuid := gen_random_uuid(); outsider uuid := gen_random_uuid();
+  result jsonb; data jsonb; original jsonb; entry_id uuid; edit_id uuid; invite text; budget_id uuid;
+begin
+  if has_table_privilege('authenticated','public.kontur_changes','select') or
+     has_function_privilege('anon','public.kontur_history()','execute') or
+     has_function_privilege('authenticated','public.kontur_record(uuid,jsonb,jsonb,uuid)','execute')
+    then raise exception 'TEST FAILED: audit permissions'; end if;
+  insert into auth.users(id) values(alice),(bob),(outsider);
+  perform set_config('request.jwt.claim.sub',alice::text,true);
+  data := '{"version":1,"start":"2026-10-09","balance":10000,"events":[]}'::jsonb;
+  result := public.kontur_create(data); budget_id := (result->>'id')::uuid; invite:=public.kontur_invite();
+  data:=jsonb_set(data,'{events}','[{"id":"rent","name":"Rent","type":"expense","date":"2026-10-10","cents":1000,"repeat":"monthly","required":true}]');
+  result:=public.kontur_save(1,data); original:=result->'budget'->'data';
+  entry_id:=(public.kontur_history()->0->>'id')::uuid;
+  if public.kontur_history()->0->>'action'<>'create' then raise exception 'TEST FAILED: addition not audited'; end if;
+  data:=jsonb_set(original,'{events,0,actuals}','[{"plannedDate":"2026-10-10","date":"2026-10-11","cents":800}]');
+  result:=public.kontur_save(2,data); data:=result->'budget'->'data';
+  edit_id:=(public.kontur_history()->0->>'id')::uuid;
+  -- Older clients must not erase fact/required metadata by omitting it.
+  result:=public.kontur_save(3,jsonb_set(data,'{events}',(data->'events') #- '{0,actuals}' #- '{0,required}'));
+  if result->'budget'->'data'->'events'->0->'actuals' is distinct from data->'events'->0->'actuals'
+    then raise exception 'TEST FAILED: older client erased fact'; end if;
+  begin perform public.kontur_undo(entry_id,4); raise exception 'TEST FAILED: undo overwrote later edit';
+    exception when raise_exception then if SQLERRM like 'TEST FAILED:%' then raise; end if; end;
+  result:=public.kontur_undo(edit_id,3);
+  if result->>'saved'<>'false' then raise exception 'TEST FAILED: stale undo accepted'; end if;
+  perform set_config('request.jwt.claim.sub',bob::text,true); perform public.kontur_join(invite);
+  result:=public.kontur_undo(edit_id,4);
+  if result->>'saved'<>'true' or result->'budget'->'data'->'events'->0 ? 'actuals'
+    then raise exception 'TEST FAILED: participant undo'; end if;
+  if public.kontur_history()->0->>'undo_of'<>edit_id::text then raise exception 'TEST FAILED: undo not audited'; end if;
+  result:=public.kontur_save(5,jsonb_set(original,'{events}','[]'));
+  entry_id:=(public.kontur_history()->0->>'id')::uuid;
+  result:=public.kontur_undo(entry_id,6);
+  if result->'budget'->'data'->'events'->0->>'author'<>'participant'
+    then raise exception 'TEST FAILED: delete undo lost author'; end if;
+  begin perform public.kontur_validate(jsonb_set(data,'{events,0,actuals,0,plannedDate}','"2026-10-12"'));
+    raise exception 'TEST FAILED: nonoccurrence fact accepted';
+    exception when raise_exception then if SQLERRM like 'TEST FAILED:%' then raise; end if; end;
+  if not public.kontur_occurs('{"date":"2026-01-31","repeat":"monthly"}', '2026-02-28')
+    then raise exception 'TEST FAILED: short-month occurrence'; end if;
+  perform set_config('request.jwt.claim.sub',outsider::text,true);
+  begin perform public.kontur_history(); raise exception 'TEST FAILED: outsider history';
+    exception when insufficient_privilege then null; end;
+  begin perform public.kontur_undo(entry_id,7); raise exception 'TEST FAILED: outsider undo';
+    exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.sub','',true);
+  begin perform public.kontur_history(); raise exception 'TEST FAILED: anonymous history';
+    exception when insufficient_privilege then null; end;
+  raise notice 'All history, fact and undo security tests passed';
+end $$;
+select 'PASS: audit permissions, history, protected facts, stale/conflicting undo, participant undo, author preservation, recurring fact validation' as result;
+rollback;
