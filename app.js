@@ -2,7 +2,19 @@
   "use strict";
   const E = FinEngine,
     $ = (id) => document.getElementById(id),
-    STORE = "kontur:budget:v1";
+    STORE = "kontur:budget:v1",
+    fmt = E.amount,
+    shortDateFormat = new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      timeZone: "UTC",
+    }),
+    longDateFormat = new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
   let storageOK = true,
     readBlocked = false,
     corruptRaw = null,
@@ -70,7 +82,7 @@
         "Локальные данные повреждены. Скачайте исходную копию в настройках и восстановите через импорт.",
       );
     const checked = E.valid(next);
-    E.project(checked, horizon, scenario);
+    forecast(checked);
     if (!shared?.active) {
       const changes = [];
       const before = new Map(state.events.map((e) => [e.id, e])),
@@ -138,15 +150,8 @@
         })[c],
     );
   }
-  function fmt(n) {
-    return E.amount(n);
-  }
   function labelDate(d) {
-    return new Date(d + "T12:00:00Z").toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "short",
-      timeZone: "UTC",
-    });
+    return shortDateFormat.format(new Date(d + "T12:00:00Z"));
   }
   function category(e) {
     return escape(
@@ -165,23 +170,29 @@
     if (e.type === "transfer") return "";
     return e.type === "income" || e.type === "borrow" ? "+" : "−";
   }
+  function forecast(data = state) {
+    // State is replaced on every mutation, so ownership and invalidation are explicit.
+    if (
+      !current ||
+      current.data !== data ||
+      current.horizon !== horizon ||
+      current.scenario !== scenario
+    )
+      current = { data, horizon, scenario, result: E.project(data, horizon, scenario) };
+    return current.result;
+  }
   function recalculation() {
     try {
-      current = E.project(state, horizon, scenario);
-      return current;
+      return forecast();
     } catch (e) {
+      current = null;
       alert("Ошибка прогноза: " + e.message);
       return null;
     }
   }
   let chartDate = null;
   function fullDate(d) {
-    return new Date(d + "T12:00:00Z").toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
-    });
+    return longDateFormat.format(new Date(d + "T12:00:00Z"));
   }
   function chart(days) {
     const w = Math.max(240, $("chart").clientWidth),
@@ -314,7 +325,7 @@
   window.addEventListener("resize", () => {
     cancelAnimationFrame(chartFrame);
     chartFrame = requestAnimationFrame(() => {
-      if (!$("overview").hidden && current) chart(current.daily);
+      if (!$("overview").hidden && current) chart(current.result.daily);
     });
   });
   function overview() {
@@ -512,9 +523,8 @@
       item.date > state.start ? item.date : state.start,
       E.shift(day > state.start ? day : state.start, 729),
     );
-    const unpaid = dates.filter(
-      (d) => !(item.actuals || []).some((f) => f.plannedDate === d),
-    );
+    const settled = new Set((item.actuals || []).map((f) => f.plannedDate));
+    const unpaid = dates.filter((d) => !settled.has(d));
     return unpaid.find((d) => d <= day) || unpaid[0] || item.actuals?.at(-1)?.plannedDate || item.date;
   }
   function paymentVisibility() {
@@ -662,7 +672,7 @@
             confidence: "confirmed",
           },
         ],
-        base = E.project(state, horizon, scenario),
+        base = forecast(),
         alt = E.project(state, horizon, scenario, extras);
       $("comparison").innerHTML =
         `<div class="comp"><span>Без займа: минимум <strong>${fmt(base.min)}</strong></span><span>С займом: минимум <strong>${fmt(alt.min)}</strong></span><span>Необходимо покрыть: <strong>${fmt(alt.needed)}</strong></span><span>Остаток на ${labelDate(alt.end)}: <strong>${fmt(alt.final)}</strong></span></div><p class="footnote">Это пробный сценарий. Он не изменил основной бюджет. Заём не учитывается как заработанный доход.</p>`;
@@ -759,6 +769,16 @@
     $("theme-toggle").textContent = dark ? "Светлая тема" : "Тёмная тема";
     $("theme-toggle").setAttribute("aria-pressed", String(dark));
   }
+  function downloadJSON(text, name) {
+    const url = URL.createObjectURL(
+        new Blob([text], { type: "application/json" }),
+      ),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
   function bind() {
     themeLabel();
     $("theme-toggle").onclick = () => {
@@ -831,25 +851,13 @@
       }
     };
     $("export").onclick = () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], {
-          type: "application/json",
-        }),
-        url = URL.createObjectURL(blob),
-        a = document.createElement("a");
-      a.href = url;
-      a.download = "kontur-backup-" + today() + ".json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      downloadJSON(
+        JSON.stringify(state, null, 2),
+        "kontur-backup-" + today() + ".json",
+      );
     };
     $("export-corrupt").onclick = () => {
-      const url = URL.createObjectURL(
-        new Blob([corruptRaw], { type: "application/json" }),
-      );
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "kontur-original.json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      downloadJSON(corruptRaw, "kontur-original.json");
     };
     $("import").onchange = async (e) => {
       const f = e.target.files[0];

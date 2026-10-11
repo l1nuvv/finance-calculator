@@ -167,6 +167,16 @@
     async reconcile(remote, choices = {}) {
       if (!remote || remote.id !== this.remote.id)
         throw Error("Общий бюджет недоступен");
+      // An unchanged server baseline cannot conflict with later local edits.
+      // Compare data as well as revision, including on first adoption of a cache.
+      if (
+        !this.conflicts.length &&
+        remote.revision === this.revision &&
+        S.equal(this.base, remote.data)
+      ) {
+        this.remote = remote;
+        return true;
+      }
       const result = S.merge(this.base, this.getData(), remote.data, choices);
       this.remote = remote;
       this.conflicts = result.conflicts;

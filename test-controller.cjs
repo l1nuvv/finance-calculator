@@ -197,6 +197,40 @@ async function test(name, fn) {
     assert.match(c.message, /недоступен/);
     assert.deepEqual(c.getData(), state());
   });
+  await test("unchanged polling refreshes membership without rewriting the local cache", async () => {
+    const db = server(), c = await controller(db), read = db.read;
+    let writes = 0, updates = 0;
+    c.cache = () => writes++;
+    c.onData = () => updates++;
+    db.read = async () => ({ ...await read(), members: 1 });
+    await c.flush();
+    await c.flush();
+    assert.equal(c.remote.members, 1);
+    assert.equal(c.dirty(), false);
+    assert.equal(writes, 0);
+    assert.equal(updates, 0);
+  });
+  await test("same revision with a different cached baseline still merges offline edits", async () => {
+    const db = server(state([event("remote")])), c = await controller(db);
+    c.base = state();
+    c.edit(state([event("offline")]));
+    await c.reconcile(await db.read());
+    assert.deepEqual(c.getData().events.map((e) => e.id), ["offline", "remote"]);
+    await c.flush();
+    assert.equal((await db.read()).data.events.length, 2);
+  });
+  await test("local edits during an unchanged read are sent on the next attempt", async () => {
+    const db = server(), c = await controller(db), read = db.read;
+    db.read = async () => {
+      const row = await read();
+      c.edit(state([event("while-reading")]));
+      db.read = read;
+      return row;
+    };
+    await c.flush();
+    assert.equal(c.dirty(), false);
+    assert.equal((await db.read()).data.events[0].id, "while-reading");
+  });
   console.log(`${count} sync controller tests passed`);
 })().catch((error) => {
   console.error(error);

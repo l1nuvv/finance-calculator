@@ -6,6 +6,10 @@
   "use strict";
   const DAY = 86400000,
     MAX = 1e12;
+  const moneyFormat = new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   function money(value) {
     const s = String(value ?? "")
       .trim()
@@ -22,12 +26,7 @@
     return Number(n);
   }
   function amount(cents) {
-    return (
-      (cents / 100).toLocaleString("ru-RU", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }) + " ₽"
-    );
+    return moneyFormat.format(cents / 100) + " ₽";
   }
   function date(s) {
     if (typeof s !== "string" || !/^[1-9]\d{3}-\d\d-\d\d$/.test(s))
@@ -180,9 +179,9 @@
     };
   }
   function occurrences(e, start, end) {
-    date(start);
+    const from = date(start).getTime(),
+      anchor = date(e.date).getTime();
     date(end);
-    date(e.date);
     const out = [],
       repeat = e.repeat ?? "once",
       until = e.end && e.end < end ? e.end : end;
@@ -191,14 +190,10 @@
     if (repeat === "weekly" || repeat === "biweekly") {
       const step = repeat === "weekly" ? 7 : 14;
       const offset =
-        Math.max(0, Math.ceil((date(start) - date(e.date)) / DAY / step)) *
-        step;
-      let d = shift(e.date, offset);
-      while (d <= until) {
-        out.push(d);
-        if ((date(until) - date(d)) / DAY < step) break;
-        d = shift(d, step);
-      }
+        Math.max(0, Math.ceil((from - anchor) / DAY / step)) * step;
+      const limit = date(until).getTime();
+      for (let time = anchor + offset * DAY; time <= limit; time += step * DAY)
+        out.push(new Date(time).toISOString().slice(0, 10));
     } else if (repeat === "monthly" || repeat === "twice") {
       const [y, m] = e.date.split("-").map(Number),
         [sy, sm] = start.split("-").map(Number),
@@ -208,18 +203,18 @@
         i <= (ey - y) * 12 + em - m;
         i++
       ) {
+        // Construct each target month once, preserving the original anchor day.
+        const month = new Date(Date.UTC(y, m - 1 + i, 1, 12)),
+          last = new Date(Date.UTC(y, m + i, 0, 12)).getUTCDate(),
+          prefix = month.toISOString().slice(0, 7) + "-";
         if (repeat === "monthly") {
-          const d = monthShift(e.date, i);
+          const d =
+            prefix + String(Math.min(+e.date.slice(8), last)).padStart(2, "0");
           if (d >= start && d <= until) out.push(d);
         } else {
-          const first = monthShift(e.date.slice(0, 7) + "-01", i);
-          const last = new Date(
-            Date.UTC(+first.slice(0, 4), +first.slice(5, 7), 0),
-          ).getUTCDate();
           for (const day of e.days ?? [10, 25]) {
             const d =
-              first.slice(0, 7) +
-              "-" +
+              prefix +
               String(Math.min(day, last)).padStart(2, "0");
             if (d >= e.date && d >= start && d <= until) out.push(d);
           }
@@ -236,6 +231,12 @@
   }
   function project(data, horizon = 30, scenario = "base", extras = []) {
     data = valid(data);
+    if (!Array.isArray(extras) || extras.length)
+      data = valid({ ...data, events: [...data.events, ...extras] });
+    return projectValidated(data, horizon, scenario);
+  }
+  // Private helpers receive normalized data; public entry points always validate.
+  function projectValidated(data, horizon, scenario) {
     if (!Number.isInteger(horizon) || horizon < 1 || horizon > 730)
       throw Error("Горизонт 1–730 дней");
     if (!["base", "conservative"].includes(scenario))
@@ -243,8 +244,7 @@
     const start = data.start,
       end = shift(start, horizon - 1),
       events = [];
-    const all = valid({ ...data, events: [...data.events, ...extras] }).events;
-    for (const e of all) {
+    for (const e of data.events) {
       if (e.paid) continue;
       const facts = new Map((e.actuals || []).map((f) => [f.plannedDate, f]));
       for (const f of facts.values()) {
@@ -292,6 +292,8 @@
       const d = shift(start, i),
         opening = bal,
         items = [];
+      let income = 0,
+        expense = 0;
       while (p < events.length && events[p].date === d) {
         const e = events[p++];
         if (e.type !== "transfer")
@@ -300,6 +302,9 @@
             (e.type === "income" || e.type === "borrow" ? 1 : -1) * e.cents,
           );
         items.push(e);
+        if (e.type === "income") income = add(income, e.cents);
+        else if (e.type === "expense" || e.type === "repay")
+          expense = add(expense, e.cents);
       }
       if (bal < min) {
         min = bal;
@@ -315,12 +320,8 @@
         opening,
         closing: bal,
         events: items,
-        income: items
-          .filter((e) => e.type === "income")
-          .reduce((s, e) => add(s, e.cents), 0),
-        expense: items
-          .filter((e) => e.type === "expense" || e.type === "repay")
-          .reduce((s, e) => add(s, e.cents), 0),
+        income,
+        expense,
       });
     }
     return {
@@ -424,6 +425,9 @@
   function balanceNow(data, asOf) {
     data = valid(data);
     date(asOf);
+    return balanceNowValidated(data, asOf);
+  }
+  function balanceNowValidated(data, asOf) {
     if (asOf < data.start)
       return {
         balance: null,
@@ -465,7 +469,7 @@
       throw Error(
         "Обновите дату и остаток в настройках: дата отсчёта слишком далеко от сегодняшней.",
       );
-    const p = project(data, Math.min(730, offset + 366));
+    const p = projectValidated(data, Math.min(730, offset + 366), "base");
     const nextIncome = p.events.find(
       (e) =>
         e.date >= from &&
@@ -483,7 +487,7 @@
         (e.required ?? true),
     );
     const reserve = items.reduce((n, e) => add(n, e.cents), 0);
-    const current = balanceNow(data, from).balance;
+    const current = balanceNowValidated(data, from).balance;
     const free = add(current, -reserve);
     return {
       from,

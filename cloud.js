@@ -181,10 +181,13 @@
       return s.user;
     }
     async signOut() {
+      const userId = this.user?.id;
       try {
         await this.request("/auth/v1/logout?scope=local", undefined);
       } finally {
-        this.remember(null);
+        // A logout started by the previous account must not erase a newer login.
+        if (this.persistent) this.session = this.storedSession();
+        if (this.user?.id === userId) this.remember(null);
       }
     }
     rpc(name, params = {}) {

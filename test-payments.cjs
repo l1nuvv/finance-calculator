@@ -1,41 +1,10 @@
 const assert = require("node:assert/strict"),
-  fs = require("node:fs"),
-  vm = require("node:vm"),
-  E = require("./engine.js");
-const source = fs.readFileSync("app.js", "utf8").replace(
-  /  load\(\);\s+bind\(\);[\s\S]*$/,
-  `  globalThis.app = { openEvent, saveEvent, fillPayment, resetPaymentDate, changePaymentStatus,
-    setState: (next) => { state = E.valid(next); }, getState: () => state };
-})();`,
-);
+  E = require("./engine.js"),
+  boot = require("./tests/helpers/app.cjs");
 function setup(events = []) {
-  let day = "2026-10-11";
-  const nodes = new Map(), stored = new Map();
-  const $ = (id) => {
-    if (!nodes.has(id)) nodes.set(id, {
-      value: id === "filter-ops" ? "all" : "", textContent: "", checked: false,
-      hidden: false, innerHTML: "", open: false,
-      classList: { remove() {} }, reset() {},
-      showModal() { this.open = true; }, close() { this.open = false; },
-    });
-    return nodes.get(id);
-  };
-  class Clock extends Date {
-    constructor(...args) { super(...(args.length ? args : [day + "T12:00:00"])); }
-  }
-  const context = vm.createContext({
-    FinEngine: E, Date: Clock, crypto: require("node:crypto").webcrypto,
-    window: { addEventListener() {} },
-    document: { getElementById: $, querySelector: () => ({ dataset: { tab: "operations" } }) },
-    localStorage: { setItem: (key, value) => stored.set(key, value) },
-  });
-  vm.runInContext(source, context);
-  context.app.setState({ version: 1, start: "2026-10-09", balance: 100000, events });
-  return {
-    app: context.app, $, advance: (value) => { day = value; },
-    save() { context.app.saveEvent({ preventDefault() {} }); },
-    data: () => JSON.parse(stored.get("kontur:budget:v1")),
-  };
+  const h = boot(events);
+  h.tab("operations");
+  return h;
 }
 const event = (extra = {}) => ({
   id: "rent", name: "Аренда", type: "expense", date: "2026-10-10",

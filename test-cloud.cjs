@@ -107,6 +107,21 @@ async function test(name, fn) {
     assert.equal(tab.getItem(key), null);
     assert.equal(browser(persistent).client.user, null);
   });
+  await test("a pending logout cannot clear a different account's newer login", async () => {
+    const persistent = storage({ [key]: JSON.stringify(session()) });
+    const replacement = session({
+      user: { id: "other-user", email: "other" + "@" + "users.kontur.invalid" },
+      refresh_token: "test-other-refresh",
+    });
+    const { client, listeners } = browser(persistent, storage(), async () => {
+      persistent.setItem(key, JSON.stringify(replacement));
+      listeners.storage({ key });
+      return response(null);
+    });
+    await assert.rejects(() => client.signOut(), /Аккаунт изменился/);
+    assert.equal(client.user.id, "other-user");
+    assert.equal(browser(persistent).client.user.id, "other-user");
+  });
   await test("another tab's logout is observed and cannot be resurrected by refresh", async () => {
     const persistent = storage({ [key]: JSON.stringify(session({ expires_at: 0 })) });
     const { client, listeners } = browser(persistent, storage(), async () => {

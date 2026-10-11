@@ -232,4 +232,31 @@ test("authorship survives normalization, export and recurring projections", () =
   for (const author of [null, {}, "<script>", "a".repeat(33)])
     assert.throws(() => E.valid(s(0, [e("bad", "2026-10-09", 100, "expense", { author })])));
 });
+test("recurrences stay within the supported date range at both boundaries", () => {
+  for (const repeat of ["once", "weekly", "biweekly", "monthly", "twice"])
+    for (const start of ["1000-01-01", "9999-12-01"])
+      assert.ok(E.occurrences(e("edge", start, 1, "expense", { repeat }), start,
+        start === "1000-01-01" ? "1000-02-28" : "9999-12-31")
+        .every((d) => E.date(d) && d >= start && d <= (start === "1000-01-01" ? "1000-02-28" : "9999-12-31")));
+  assert.deepEqual(E.occurrences(e("edge", "9999-12-31", 1, "expense", { repeat: "weekly" }),
+    "9999-12-31", "9999-12-31"), ["9999-12-31"]);
+});
+test("monthly days 29 to 31 restore their anchor after February", () => {
+  for (const year of [2024, 2025])
+    for (const day of [29, 30, 31]) {
+      const dates = E.occurrences(e("rent", `${year}-01-${day}`, 1, "expense", { repeat: "monthly" }),
+        `${year}-01-01`, `${year}-03-31`);
+      assert.deepEqual(dates, [`${year}-01-${day}`, `${year}-02-${year === 2024 ? 29 : 28}`, `${year}-03-${day}`]);
+    }
+});
+test("weekly plans ending beyond year 9999 do not reject a valid final-day forecast", () => {
+  for (const repeat of ["weekly", "biweekly"])
+    assert.equal(E.project(s(123, [e("last", "9999-12-30", 1, "expense", { repeat })], "9999-12-31"), 1).final, 123);
+});
+test("money formatting keeps the existing Russian decimal and currency representation", () => {
+  for (const cents of [0, 1, -2, 10005, 1e12, -1e12])
+    assert.equal(E.amount(cents), (cents / 100).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }) + " ₽");
+});
 console.log(`${count} financial tests passed`);

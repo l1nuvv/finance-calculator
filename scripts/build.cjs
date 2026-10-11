@@ -5,25 +5,7 @@ const fs = require("node:fs"),
 const root = path.resolve(__dirname, ".."),
   out = path.join(root, "_site");
 fs.mkdirSync(out, { recursive: true });
-const files = [
-  "index.html",
-  "style.css",
-  "theme.js",
-  "config.js",
-  "engine.js",
-  "sync-core.js",
-  "cloud.js",
-  "sync-controller.js",
-  "chart-core.js",
-  "app.js",
-  "help.js",
-  "pwa.js",
-  "sw.js",
-  "manifest.webmanifest",
-  "icon-180.png",
-  "icon-192.png",
-  "icon-512.png",
-];
+const files = require("./public-files.cjs");
 for (const item of fs.readdirSync(out)) {
   if (![...files, ".nojekyll"].includes(item))
     throw Error("Unexpected file in deploy directory: " + item);

@@ -3,6 +3,7 @@ const CACHE = "kontur-shell-__BUILD__";
 const BUILD = CACHE.slice("kontur-shell-".length);
 const PRECACHE = ["index.html"]; // BUILD_PRECACHE
 const base = new URL("./", self.location.href);
+const allowed = new Set(PRECACHE.map((path) => new URL(path, base).href));
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -69,8 +70,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  const allowed = PRECACHE.map((path) => new URL(path, base).href);
-  if (allowed.includes(url.href))
+  if (allowed.has(url.href))
     event.respondWith(
       caches
         .open(CACHE)
