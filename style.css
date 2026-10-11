@@ -263,6 +263,18 @@ nav button:hover {
   background: var(--risk);
   color: var(--danger);
 }
+.app-update {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app-update span {
+  flex: 1 1 240px;
+}
+.app-update[hidden] {
+  display: none;
+}
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

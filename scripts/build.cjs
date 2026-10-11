@@ -63,12 +63,13 @@ html = html.replace(
   '"manifest.webmanifest"',
   `"manifest.webmanifest?v=${versions["manifest.webmanifest"]}"`,
 );
-fs.writeFileSync(path.join(out, "index.html"), html);
 const build = crypto
   .createHash("sha256")
   .update(html)
   .digest("hex")
   .slice(0, 16);
+html = html.replace('content="__BUILD__"', `content="${build}"`);
+fs.writeFileSync(path.join(out, "index.html"), html);
 const worker = fs
   .readFileSync(path.join(root, "sw.js"), "utf8")
   .replace("__BUILD__", build)

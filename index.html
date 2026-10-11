@@ -14,6 +14,7 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://riexltlejfjswlbfyhnm.supabase.co; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <meta name="referrer" content="no-referrer" />
+    <meta name="kontur-build" content="__BUILD__" />
     <title>Контур — финансовый планировщик</title>
     <link rel="stylesheet" href="style.css" />
     <script src="theme.js"></script>
@@ -72,6 +73,11 @@
             ><button id="add" class="primary" hidden>+ Операция</button>
           </div>
         </header>
+        <div id="app-update" class="notice app-update" role="status" hidden>
+          <span>Доступна новая версия Контура. Сохрани незаконченные изменения и
+            нажми «Обновить».</span>
+          <button id="apply-update">Обновить</button>
+        </div>
         <section id="overview" class="tab" hidden>
           <div class="toolbar">
             <label
@@ -413,6 +419,8 @@
               главный экран». iPhone: в Safari нажмите «Поделиться» → «На экран
               Домой».
             </p>
+            <button id="check-update">Проверить обновление</button>
+            <p id="update-note" class="muted" role="status"></p>
             <p class="footnote">
               После первого открытия интерфейс доступен без сети. Новый вход и
               общая история требуют подключения. В открытой сессии

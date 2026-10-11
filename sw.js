@@ -1,5 +1,6 @@
 "use strict";
 const CACHE = "kontur-shell-__BUILD__";
+const BUILD = CACHE.slice("kontur-shell-".length);
 const PRECACHE = ["index.html"]; // BUILD_PRECACHE
 const base = new URL("./", self.location.href);
 self.addEventListener("install", (event) => {
@@ -7,7 +8,11 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE)
       .then((cache) =>
-        cache.addAll(PRECACHE.map((path) => new URL(path, base).href)),
+        cache.addAll(
+          PRECACHE.map((path) =>
+            new Request(new URL(path, base).href, { cache: "reload" }),
+          ),
+        ),
       )
       .then(() => self.skipWaiting()),
   );
@@ -23,8 +28,22 @@ self.addEventListener("activate", (event) => {
             .map((key) => caches.delete(key)),
         ),
       )
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then((clients) =>
+        clients.forEach((client) => {
+          if (client.url.startsWith(base.href))
+            client.postMessage({ type: "KONTUR_VERSION", build: BUILD });
+        }),
+      ),
   );
+});
+self.addEventListener("message", (event) => {
+  if (
+    event.data?.type === "KONTUR_VERSION" &&
+    event.source?.url?.startsWith(base.href)
+  )
+    event.source.postMessage({ type: "KONTUR_VERSION", build: BUILD });
 });
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
@@ -37,7 +56,7 @@ self.addEventListener("fetch", (event) => {
     return;
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: "no-store" })
         .then(async (response) => {
           if (!response.ok) throw Error("Navigation unavailable");
           return response;
