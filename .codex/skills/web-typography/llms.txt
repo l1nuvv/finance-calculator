@@ -1,0 +1,14 @@
+# Web Typography Skill
+
+This repository contains an Apache-2.0 AI-agent skill for front-end web
+typography.
+
+Primary files:
+
+- `SKILL.md`: core skill instructions.
+- `assets/starter.css`: starter CSS for accessible type systems.
+- `references/`: deeper guidance for typography foundations, fluid type scales,
+  font loading, accessibility, modern CSS, and decision records.
+
+Use this skill when an agent needs to improve readability, hierarchy, font
+loading, responsive type, or accessible text in a web project.

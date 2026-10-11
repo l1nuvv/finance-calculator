@@ -28,12 +28,12 @@ async function test(name, fn) { await fn(); count++; console.log("OK", name); }
     assert.equal(h.data().balance, 123400);
     assert.equal(h.$("ending").textContent, "1 234,00 ₽");
   });
-  await test("upcoming operations preserve recent-first order and the eight-item limit", () => {
+  await test("upcoming operations keep the nearest eight payments", () => {
     const h = setup(Array.from({ length: 10 }, (_, i) => event("payment-" + i, `2026-10-${10 + i}`)));
     h.tab("overview");
     const html = h.$("upcoming").innerHTML;
-    assert.ok(html.indexOf("payment-9") < html.indexOf("payment-2"));
-    assert.ok(!html.includes("payment-0") && !html.includes("payment-1"));
+    const names = [...html.matchAll(/entry-title">([^<]+)/g)].map((match) => match[1]);
+    assert.deepEqual(names, Array.from({ length: 8 }, (_, i) => "payment-" + i));
   });
   await test("untrusted operation text is escaped in the rendered list", () => {
     const h = setup([event("xss", undefined, { name: '<img src=x onerror="bad()">', category: "<script>" })]);
@@ -41,6 +41,23 @@ async function test(name, fn) { await fn(); count++; console.log("OK", name); }
     assert.ok(!h.$("ops").innerHTML.includes("<img"));
     assert.ok(h.$("ops").innerHTML.includes("&lt;img"));
     assert.ok(h.$("ops").innerHTML.includes("&lt;script&gt;"));
+  });
+  await test("operation filters report results and reset together", () => {
+    const h = setup([event("rent"), event("salary", undefined, { type: "income" })]);
+    h.tab("operations");
+    assert.equal(h.$("ops-count").textContent, "Показано: 2 из 2");
+    assert.equal(h.$("clear-ops").hidden, true);
+    h.$("search-ops").value = "rent";
+    h.$("filter-ops").value = "income";
+    h.$("filter-ops").onchange();
+    assert.equal(h.$("ops-count").textContent, "Показано: 0 из 2");
+    assert.equal(h.$("clear-ops").hidden, false);
+    h.$("clear-ops").onclick();
+    assert.equal(h.$("search-ops").value, "");
+    assert.equal(h.$("filter-ops").value, "all");
+    assert.equal(h.$("ops-count").textContent, "Показано: 2 из 2");
+    assert.equal(h.$("clear-ops").hidden, true);
+    assert.equal(h.$("search-ops").focused, true);
   });
   await test("corrupt persisted data stays protected until an explicit recovery import", async () => {
     const raw = "{broken", h = setup([], { raw });
@@ -70,6 +87,25 @@ async function test(name, fn) { await fn(); count++; console.log("OK", name); }
     await h.$("history-list").onclick({ target: { closest: () => ({ dataset: { undo: entry.id } }) } });
     assert.equal(h.data().events.length, 0);
     assert.equal(JSON.parse(h.stored.get("kontur:history:v1"))[0].undo_of, entry.id);
+  });
+  await test("history describes confidence-only changes and repetition end dates in Russian", () => {
+    const h = setup([event("rent", "2026-10-15", { repeat: "monthly", confidence: "confirmed" })]);
+    h.app.openEvent(h.app.getState().events[0]);
+    h.$("event-confidence").value = "expected";
+    h.save();
+    h.tab("history");
+    let html = h.$("history-list").innerHTML;
+    assert.match(html, /Надёжность поступления: Подтверждено/);
+    assert.match(html, /Надёжность поступления: Ожидается/);
+    assert.match(html, /Повторение: Каждый месяц/);
+    assert.ok(!html.includes("monthly") && !html.includes("обязательность по типу"));
+    h.app.openEvent(h.app.getState().events[0]);
+    h.$("event-end").value = "2027-01-15";
+    h.save();
+    h.tab("history");
+    html = h.$("history-list").innerHTML;
+    assert.match(html, /Повторять до: без даты окончания/);
+    assert.match(html, /Повторять до: 15 января 2027/);
   });
   await test("theme changes update the accessible state and device preference", () => {
     const h = setup();

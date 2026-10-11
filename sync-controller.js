@@ -241,12 +241,12 @@
           value === undefined
             ? "Удалено"
             : Array.isArray(value)
-              ? value[0] + " · " + E.amount(value[1])
-              : `${value.name} · ${E.amount(value.cents)} · ${value.date} · ${value.repeat} · ${value.paid ? "учтено" : "в прогнозе"} · ${value.confidence} · ${value.category}`;
+              ? KonturBudgetCopy.date(value[0]) + ", " + E.amount(value[1])
+              : KonturBudgetCopy.describeEvent(value);
         versions.textContent =
-          "На устройстве: " +
+          "На устройстве:\n" +
           describe(conflict.local) +
-          "\nВ облаке: " +
+          "\n\nВ общем бюджете:\n" +
           describe(conflict.remote);
         const select = document.createElement("select");
         select.dataset.conflict = conflict.key;

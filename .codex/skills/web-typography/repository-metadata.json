@@ -1,0 +1,19 @@
+{
+  "name": "web-typography-skill",
+  "description": "Apache-2.0 AI-agent skill for readable, accessible, high-performance web typography.",
+  "license": "Apache-2.0",
+  "topics": [
+    "ai-agents",
+    "agent-skills",
+    "codex-skills",
+    "claude-code",
+    "web-typography",
+    "css",
+    "frontend",
+    "accessibility",
+    "wcag",
+    "font-loading",
+    "design-systems",
+    "open-source"
+  ]
+}

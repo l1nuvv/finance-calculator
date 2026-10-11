@@ -232,6 +232,10 @@
                 </select></label
               >
             </div>
+            <div class="ops-results">
+              <span id="ops-count" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
+              <button id="clear-ops" hidden>Сбросить фильтры</button>
+            </div>
             <div id="ops" class="entries"></div>
           </article>
         </section>
@@ -447,13 +451,9 @@
             </p>
             <div class="actions">
               <button id="export">Скачать JSON</button
-              ><label class="filebutton"
-                >Загрузить JSON<input
-                  type="file"
-                  id="import"
-                  accept="application/json,.json"
-                  hidden /></label
-              ><button id="reset" class="danger">Очистить данные</button>
+              ><button id="import-button" type="button">Загрузить JSON</button>
+              <input type="file" id="import" accept="application/json,.json" hidden />
+              <button id="reset" class="danger">Очистить данные</button>
             </div>
             <button id="export-corrupt" hidden>
               Скачать исходные данные для восстановления
@@ -716,7 +716,7 @@
               </p>
             </details>
             <details>
-              <summary>Кредиты, долги и «Быстрое сравнение»</summary>
+              <summary>Кредиты, долги и проверка нового займа</summary>
               <p>
                 Взяли деньги в долг — добавьте «Получение займа». Отдали —
                 «Возврат долга». Перевод между своими счетами не меняет общую
@@ -734,8 +734,8 @@
                 суммы смотрите в графике банка.
               </p>
               <p>
-                «Быстрое сравнение» помогает проверить: «Что будет, если взять
-                ещё денег в долг?» Оно только показывает результат. Новые
+                В «Обзоре» откройте «Проверить: что будет, если взять в долг».
+                Этот блок только показывает результат. Новые
                 операции в бюджет нужно добавить отдельно.
               </p>
             </details>
@@ -843,6 +843,7 @@
     </dialog>
     <script src="config.js" defer></script>
     <script src="engine.js" defer></script>
+    <script src="budget-copy.js" defer></script>
     <script src="sync-core.js" defer></script>
     <script src="cloud.js" defer></script>
     <script src="sync-controller.js" defer></script>

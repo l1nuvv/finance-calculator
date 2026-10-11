@@ -1,0 +1,5 @@
+interface:
+  display_name: "Web Typography"
+  short_description: "Readable, accessible web type systems"
+  brand_color: "#2563EB"
+  default_prompt: "Use $web-typography to improve the readability, type scale, font loading, and accessibility of this web UI."

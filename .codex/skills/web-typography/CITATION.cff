@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this skill, please cite it using this metadata."
+title: "Web Typography Skill"
+version: "0.1.0"
+date-released: "2026-06-03"
+license: "Apache-2.0"
+authors:
+  - family-names: "Gonzalez de Cruz"
+    given-names: "Simon"
+repository-code: "https://github.com/simongonzalezdc/web-typography-skill"
+abstract: "An Apache-2.0 skill for AI agents applying expert web typography in front-end projects."

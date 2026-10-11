@@ -351,7 +351,7 @@
     obligations();
     const arr = p.events
       .filter((e) => e.type !== "transfer")
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 8);
     $("up-count").textContent = String(p.events.length) + " событий";
     $("upcoming").innerHTML = arr.length
@@ -410,6 +410,8 @@
               .includes(query)),
       )
       .sort((a, b) => displayedPayment(b).date.localeCompare(displayedPayment(a).date));
+    $("ops-count").textContent = `Показано: ${list.length} из ${state.events.length}`;
+    $("clear-ops").hidden = !query && filter === "all";
     $("ops").innerHTML = list.length
       ? list
           .map(
@@ -427,7 +429,7 @@
     $("days").innerHTML = p.daily
       .map(
         (x) =>
-          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
+          `<div class="day"><button data-date="${x.date}" aria-expanded="false" aria-controls="day-${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b><span class="day-chevron" aria-hidden="true">›</span></button><div class="detail" id="day-${x.date}" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
       )
       .join("");
   }
@@ -443,7 +445,7 @@
         .filter((e) => e.type === "repay")
         .reduce((a, e) => a + e.cents, 0);
     $("debt-summary").innerHTML =
-      `<p>Разница запланированных поступлений займов и возвратов: <strong>${fmt(owed)}</strong>.</p><p class="footnote">Это НЕ фактическая задолженность: без отдельных записей о прошлых операциях нельзя достоверно вычислить текущий долг. Не путайте заём с доходом.</p>`;
+      `<p>Разница сумм займов и возвратов в добавленных операциях: <strong>${fmt(owed)}</strong>.</p><p class="footnote">Здесь складываются суммы из карточек операций, включая завершённые. Повторения и отмеченные платежи не учитываются. Это не текущий долг. Не путайте заём с доходом.</p>`;
   }
   function draw() {
     const active =
@@ -725,8 +727,9 @@
                 ? "Нет записи"
                 : e.event_id === null
                   ? `${fmt(value.balance)} · ${labelDate(value.start)}`
-                  : `${escape(value.name)} · ${planFact(value)} · ${labelDate(value.date)} · ${category(value)} · ${escape(value.repeat || "once")} · ${value.paid ? "учтена в остатке" : "в расчёте"} · ${value.required === false ? "необязательная" : "обязательность по типу"}`;
-            return `<div class="entry history-entry"><div><div class="entry-title">${e.undo_of ? "Отмена: " : ""}${label}</div><div class="entry-note">${escape(e.actor)} · ${escape(new Date(e.created_at).toLocaleString("ru-RU"))}</div><div class="entry-note">Было: ${describe(e.before)}</div><div class="entry-note">Стало: ${describe(e.after)}</div></div><button data-undo="${escape(e.id)}">Отменить</button></div>`;
+                  : escape(KonturBudgetCopy.describeEvent(value));
+            const name = e.event_id === null ? "Остаток и дата" : e.after?.name || e.before?.name || "Операция";
+            return `<div class="entry history-entry"><div><div class="entry-title">${e.undo_of ? "Отмена: " : ""}${label}</div><div class="entry-note">${escape(e.actor)} · ${escape(new Date(e.created_at).toLocaleString("ru-RU"))}</div><details class="history-versions"><summary>${escape(name)}: посмотреть изменения</summary><div class="entry-note operation-description">Было: ${describe(e.before)}</div><div class="entry-note operation-description">Стало: ${describe(e.after)}</div></details></div><button data-undo="${escape(e.id)}">Отменить</button></div>`;
           })
           .join("") ||
         '<p class="empty">История пока пуста. Новые изменения появятся здесь.</p>';
@@ -826,6 +829,12 @@
     $("event-form").addEventListener("submit", saveEvent);
     $("search-ops").oninput = operations;
     $("filter-ops").onchange = operations;
+    $("clear-ops").onclick = () => {
+      $("search-ops").value = "";
+      $("filter-ops").value = "all";
+      operations();
+      $("search-ops").focus();
+    };
     $("period").onchange = (e) => {
       horizon = +e.target.value;
       draw();
@@ -859,6 +868,7 @@
     $("export-corrupt").onclick = () => {
       downloadJSON(corruptRaw, "kontur-original.json");
     };
+    $("import-button").onclick = () => $("import").click();
     $("import").onchange = async (e) => {
       const f = e.target.files[0];
       if (!f) return;
@@ -920,6 +930,7 @@
         '[data-detail="' + b.dataset.date + '"]',
       );
       d.hidden = !d.hidden;
+      b.setAttribute("aria-expanded", String(!d.hidden));
     };
   }
   function sync() {

@@ -6,6 +6,7 @@ const E = require("./engine.js"),
 const context = {
   FinEngine: E,
   KonturSync: S,
+  KonturBudgetCopy: require("./budget-copy.js"),
   document: { hidden: false },
   navigator: { onLine: true },
 };
@@ -230,6 +231,30 @@ async function test(name, fn) {
     await c.flush();
     assert.equal(c.dirty(), false);
     assert.equal((await db.read()).data.events[0].id, "while-reading");
+  });
+  await test("conflict choices expose different actual payments with Russian settings", () => {
+    const originalDocument = context.document;
+    const node = () => ({ children: [], textContent: "", dataset: {},
+      append(...children) { this.children.push(...children); },
+      replaceChildren() { this.children = []; },
+    });
+    const host = node();
+    context.document = { getElementById: () => host, createElement: node };
+    try {
+      const baseEvent = state([{ ...event("rent", 3000000), repeat: "monthly" }]).events[0];
+      const facts = (cents, date) => ({ ...baseEvent,
+        actuals: [{ plannedDate: "2026-10-09", date, cents }],
+      });
+      const base = state([baseEvent]);
+      const merged = S.merge(base, state([facts(2900000, "2026-10-10")]), state([facts(3100000, "2026-10-11")]));
+      context.SharedBudget.prototype.renderConflicts.call({ conflicts: merged.conflicts });
+      const text = host.children[1].children[0].textContent;
+      assert.ok(text.includes(E.amount(2900000)) && text.includes(E.amount(3100000)));
+      assert.match(text, /10 октября 2026/);
+      assert.match(text, /11 октября 2026/);
+      assert.match(text, /Повторение: Каждый месяц/);
+      assert.ok(!text.includes("monthly") && !text.includes("confirmed"));
+    } finally { context.document = originalDocument; }
   });
   console.log(`${count} sync controller tests passed`);
 })().catch((error) => {

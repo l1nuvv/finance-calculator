@@ -35,7 +35,7 @@
   --line: #3d4b40;
   --subtle: #29332b;
   --accent: #357b56;
-  --accent-hover: #408e64;
+  --accent-hover: #347650;
   --accent-soft: #2b4031;
   --positive: #a0d8af;
   --danger: #f5aa95;
@@ -47,7 +47,7 @@
 }
 body {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 button,
@@ -109,23 +109,27 @@ select:focus {
 input[readonly] {
   background: var(--subtle);
 }
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
 label {
   display: grid;
   gap: 7px;
   min-width: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 h1 {
-  font-size: 26px;
+  font-size: 1.625rem;
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: -0.035em;
   margin: 0;
 }
 h2 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.4;
   letter-spacing: -0.02em;
   margin: 0 0 18px;
@@ -136,7 +140,7 @@ p {
 }
 .shell {
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr);
+  grid-template-columns: 12.25rem minmax(0, 1fr);
   min-height: 100vh;
 }
 .sidebar {
@@ -144,6 +148,7 @@ p {
   top: 0;
   align-self: start;
   height: 100dvh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 36px;
@@ -153,13 +158,16 @@ p {
 }
 .brand {
   display: grid;
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 24px minmax(0, 1fr);
   column-gap: 9px;
   padding: 0 10px;
   align-items: center;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 750;
   letter-spacing: 0.12em;
+}
+.brand span {
+  overflow-wrap: anywhere;
 }
 .mark {
   width: 24px;
@@ -169,7 +177,7 @@ p {
 .brand small {
   grid-column: 2;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 400;
   letter-spacing: 0;
   color: var(--muted);
@@ -185,6 +193,7 @@ nav button {
   background: transparent;
   color: var(--muted);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 nav button.selected {
   background: var(--accent-soft);
@@ -201,7 +210,7 @@ nav button:hover {
   margin-top: auto;
   padding: 16px 10px 0;
   border-top: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.7;
 }
 .aside-foot span {
@@ -234,7 +243,7 @@ nav button:hover {
   max-width: 260px;
 }
 .muted {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .toolbar {
@@ -245,7 +254,7 @@ nav button:hover {
   align-items: end;
 }
 .toolbar label {
-  flex: 0 1 200px;
+  flex: 0 1 12.5rem;
 }
 .notice {
   padding: 11px 14px;
@@ -253,7 +262,7 @@ nav button:hover {
   border-left: 3px solid var(--accent);
   color: var(--ink);
   background: var(--accent-soft);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .notice.risk {
   border-color: var(--danger);
@@ -286,13 +295,13 @@ nav button:hover {
   border-left: 0;
 }
 .stat div {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .stat strong {
   display: block;
   margin: 8px 0 6px;
-  font-size: clamp(19px, 2vw, 29px);
+  font-size: clamp(1.1875rem, 1rem + 0.9vw, 1.8125rem);
   letter-spacing: -0.045em;
   line-height: 1.2;
   font-weight: 650;
@@ -303,7 +312,7 @@ nav button:hover {
   color: var(--positive);
 }
 .stat small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
 }
 .negative {
@@ -343,11 +352,11 @@ nav button:hover {
 }
 .panel-title span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chart-info,
 .footnote {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   line-height: 1.6;
   margin: 14px 0 0;
@@ -376,6 +385,7 @@ nav button:hover {
 }
 .entry {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -387,16 +397,26 @@ nav button:hover {
 }
 .entry > div:first-child {
   min-width: 0;
+  flex: 1 1 12rem;
 }
 .entry-title {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .entry-note {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   margin-top: 5px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.operation-description {
+  white-space: pre-line;
+}
+.history-versions summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .entry-value {
@@ -420,7 +440,7 @@ nav button:hover {
   max-width: none;
 }
 .entry-actions button {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 7px 10px;
 }
 .entry-actions .entry-value {
@@ -454,12 +474,12 @@ nav button:hover {
 }
 .loanmetrics div {
   min-width: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .loanmetrics strong {
   display: block;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 650;
   color: var(--ink);
   margin-top: 6px;
@@ -512,12 +532,24 @@ nav button:hover {
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
 }
+.ops-results {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+}
+.ops-results button {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+}
 .day {
   border-bottom: 1px solid var(--line);
 }
 .day > button {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) auto;
+  grid-template-columns: 100px minmax(0, 1fr) auto 16px;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -530,6 +562,18 @@ nav button:hover {
 }
 .day > button:hover {
   background: var(--subtle);
+}
+.day > button[aria-expanded="true"] {
+  background: var(--subtle);
+}
+.day-chevron {
+  font-size: 1.25rem;
+  line-height: 1;
+  text-align: center;
+  color: var(--muted);
+}
+.day > button[aria-expanded="true"] .day-chevron {
+  transform: rotate(90deg);
 }
 .day .detail {
   padding: 12px 16px;
@@ -572,7 +616,7 @@ dialog::backdrop {
   margin: 0;
 }
 .iconbutton {
-  font-size: 24px;
+  font-size: 1.5rem;
   width: 42px;
   padding: 0;
   border: 0;
@@ -603,14 +647,14 @@ dialog::backdrop {
 }
 .error {
   color: var(--danger);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .error:empty {
   display: none;
 }
 footer {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin-top: 32px;
 }
 #loan-result {
@@ -624,7 +668,7 @@ footer {
 table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 td,
 th {
@@ -655,7 +699,7 @@ th:first-child {
   padding: 0 0 24px;
 }
 #cloud-status {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 12px 14px;
   background: var(--subtle);
   border-left: 3px solid var(--accent);
@@ -675,7 +719,7 @@ th:first-child {
 }
 #invite-output {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-bottom: 8px;
 }
 .conflicts {
@@ -722,7 +766,7 @@ th:first-child {
   flex: 0 0 28px;
   padding: 0;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   cursor: help;
 }
@@ -741,7 +785,7 @@ th:first-child {
   background: var(--surface);
   color: var(--ink);
   box-shadow: 0 8px 30px #0002;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   font-weight: 400;
 }
@@ -818,7 +862,7 @@ th:first-child {
   }
   .brand {
     padding: 0;
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
   .brand small {
     display: none;
@@ -827,7 +871,7 @@ th:first-child {
     display: none;
   }
   nav {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 5rem), 1fr));
     gap: 0;
   }
   nav button,
@@ -835,13 +879,13 @@ th:first-child {
     min-height: 44px;
     padding: 10px 4px;
     text-align: center;
-    font-size: 12px;
+    font-size: 0.75rem;
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
   }
   nav button.selected {
-    background: transparent;
+    background: var(--accent-soft);
     border-bottom-color: var(--accent);
   }
   .content {
@@ -851,7 +895,7 @@ th:first-child {
     gap: 12px;
   }
   .top h1 {
-    font-size: 24px;
+    font-size: 1.5rem;
   }
   .entry-actions {
     max-width: 56%;
@@ -859,7 +903,7 @@ th:first-child {
 }
 @media (max-width: 540px) {
   body {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   .sidebar {
     padding: 14px 16px 0;
@@ -872,8 +916,8 @@ th:first-child {
   nav button,
   nav button.selected {
     padding: 8px 3px;
-    font-size: 12px;
-    min-height: 40px;
+    font-size: 0.75rem;
+    min-height: 2.75rem;
   }
   .content {
     padding: 20px 16px 28px;
@@ -895,11 +939,12 @@ th:first-child {
   .head-actions #saved {
     grid-column: 1 / -1;
     text-align: left;
-    font-size: 12px;
+    font-size: 0.75rem;
+    order: 1;
   }
   .head-actions button {
     min-height: 44px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   #theme-toggle {
     background: transparent;
@@ -913,16 +958,16 @@ th:first-child {
     grid-column: 1 / -1;
   }
   .toolbar label:first-child {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
     align-items: center;
   }
   .toolbar input,
   .toolbar select {
     padding: 9px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .notice {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .stats {
     gap: 20px 0;
@@ -933,10 +978,10 @@ th:first-child {
     padding: 0 0 0 14px;
   }
   .stat strong {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   .stat small {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .panel {
     padding: 18px 16px;
@@ -946,10 +991,10 @@ th:first-child {
     gap: 6px;
   }
   .panel-title h2 {
-    font-size: 16px;
+    font-size: 1rem;
   }
   .panel-title span {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .two {
     gap: 20px;
@@ -969,6 +1014,10 @@ th:first-child {
     width: 100%;
     justify-content: flex-start;
   }
+  #ops .entry > div:first-child {
+    flex: 0 1 auto;
+    width: 100%;
+  }
   #ops .entry-actions .entry-value {
     margin-right: auto;
   }
@@ -977,7 +1026,7 @@ th:first-child {
     padding: 8px 10px;
   }
   .entry-value {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .history-entry {
     flex-wrap: wrap;
@@ -994,7 +1043,7 @@ th:first-child {
   }
   .loanmetrics strong {
     margin: 0;
-    font-size: 20px;
+    font-size: 1.25rem;
     text-align: right;
   }
   .scenario-form,
@@ -1008,10 +1057,25 @@ th:first-child {
     grid-template-columns: 1fr;
   }
   .day > button {
-    grid-template-columns: 68px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto 16px;
     gap: 6px;
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 16px 0;
+  }
+  .day > button > span:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    color: var(--muted);
+  }
+  .day > button > b {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .day-chevron {
+    grid-column: 3;
+    grid-row: 1 / 3;
   }
   .invite-join {
     flex-direction: column;
@@ -1031,7 +1095,7 @@ th:first-child {
     min-height: 44px;
   }
   .check {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .help-button {
     width: 32px;
@@ -1092,7 +1156,7 @@ th:first-child {
 .chart-controls button {
   min-height: 44px;
   padding: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .chart-controls label {
   max-width: 240px;
@@ -1102,7 +1166,7 @@ th:first-child {
 .chart-slider-label {
   margin-top: 14px;
   font-weight: 400;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 #chart-day {
   accent-color: var(--accent);
@@ -1129,14 +1193,14 @@ th:first-child {
   gap: 4px;
 }
 .chart-day-heading > strong {
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 .chart-day-heading span,
 .chart-day-opening {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chart-day-opening {
   margin: 12px 0 4px;
@@ -1149,7 +1213,7 @@ th:first-child {
   margin: -4px 0 24px;
   border-bottom: 1px solid var(--line);
   padding-bottom: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .balance-breakdown summary {
   cursor: pointer;
@@ -1169,13 +1233,13 @@ th:first-child {
 }
 .balance-equation div {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .balance-equation strong {
   color: var(--ink);
   display: block;
   margin-top: 6px;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
@@ -1184,7 +1248,7 @@ th:first-child {
     gap: 8px;
   }
   .chart-day-heading > strong {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   .balance-equation {
     grid-template-columns: repeat(2, minmax(0, 1fr));

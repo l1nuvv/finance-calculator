@@ -23,7 +23,7 @@ module.exports = function setup(events = [], options = {}) {
         removeAttribute: (name) => attributes.delete(name),
         getAttribute: (name) => attributes.get(name) ?? null,
         addEventListener(name, handler) { this["on" + name] = handler; },
-        replaceChildren() { this.innerHTML = ""; }, reset() {},
+        replaceChildren() { this.innerHTML = ""; }, reset() {}, focus() { this.focused = true; },
         showModal() { this.open = true; }, close() { this.open = false; },
       });
     }
@@ -40,7 +40,7 @@ module.exports = function setup(events = [], options = {}) {
   }
   const context = vm.createContext({
     FinEngine: { ...E, project(...args) { projectCalls++; return E.project(...args); } },
-    KonturChart: C, Date: Clock, crypto: require("node:crypto").webcrypto,
+    KonturChart: C, KonturBudgetCopy: require("../../budget-copy.js"), Date: Clock, crypto: require("node:crypto").webcrypto,
     window: { addEventListener() {} },
     document: {
       getElementById: $, documentElement: { dataset: { theme: "light" } },
