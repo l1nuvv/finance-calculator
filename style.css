@@ -568,8 +568,7 @@ dialog::backdrop {
 .dialoghead h2 {
   margin: 0;
 }
-.iconbutton,
-#fact-close {
+.iconbutton {
   font-size: 24px;
   width: 42px;
   padding: 0;

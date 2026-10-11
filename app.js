@@ -8,7 +8,6 @@
     corruptRaw = null,
     shared = null,
     editingEvent = null,
-    editingFact = null,
     localHistory = [],
     historyEpoch = 0;
   const today = () => {
@@ -286,7 +285,7 @@
     $("chart-prev").disabled = index === 0;
     $("chart-next").disabled = index === days.length - 1;
     $("chart-detail").innerHTML =
-      `<div class="chart-day-heading"><div><strong>${fullDate(day.date)}</strong><span>После платежей этого дня</span></div><strong class="${day.closing < 0 ? "negative" : ""}">${fmt(day.closing)}</strong></div><div class="chart-day-opening">До платежей: ${fmt(day.opening)}</div>${day.events.length ? day.events.map((e) => `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${e.actual ? "Уже отмечено через «Факт»" : "Запланировано"} · ${category(e)}</div></div><span class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</span></div>`).join("") : '<p class="empty">На этот день платежей нет — сумма не меняется.</p>'}`;
+      `<div class="chart-day-heading"><div><strong>${fullDate(day.date)}</strong><span>После платежей этого дня</span></div><strong class="${day.closing < 0 ? "negative" : ""}">${fmt(day.closing)}</strong></div><div class="chart-day-opening">До платежей: ${fmt(day.opening)}</div>${day.events.length ? day.events.map((e) => `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${e.actual ? "Уже произошло" : "Запланировано"} · ${category(e)}</div></div><span class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</span></div>`).join("") : '<p class="empty">На этот день платежей нет — сумма не меняется.</p>'}`;
   }
   function actualBalance() {
     try {
@@ -303,7 +302,7 @@
       $("balance-calculation").innerHTML =
         a.balance === null
           ? `<p>Вы указали деньги на будущую дату ${fullDate(a.start)}. Для баланса на сегодня задайте начальную сумму и дату не позже сегодняшней.</p>`
-          : `<div class="balance-equation"><div>На начало ${labelDate(a.start)}<strong>${fmt(state.balance)}</strong></div><div>Уже пришло<strong class="positive">${a.received ? "+" : ""}${fmt(a.received)}</strong></div><div>Уже потрачено<strong>${a.spent ? "−" : ""}${fmt(a.spent)}</strong></div><div>Баланс сейчас<strong>${fmt(a.balance)}</strong></div></div>${a.events.map((e) => `<div class="entry"><div>${escape(e.name)}<div class="entry-note">${labelDate(e.date)} · уже отмечено через «Факт»</div></div><span class="entry-value">${sign(e)}${fmt(e.cents)}</span></div>`).join("")}`;
+          : `<div class="balance-equation"><div>На начало ${labelDate(a.start)}<strong>${fmt(state.balance)}</strong></div><div>Уже пришло<strong class="positive">${a.received ? "+" : ""}${fmt(a.received)}</strong></div><div>Уже потрачено<strong>${a.spent ? "−" : ""}${fmt(a.spent)}</strong></div><div>Баланс сейчас<strong>${fmt(a.balance)}</strong></div></div>${a.events.map((e) => `<div class="entry"><div>${escape(e.name)}<div class="entry-note">${labelDate(e.date)} · уже произошло</div></div><span class="entry-value">${sign(e)}${fmt(e.cents)}</span></div>`).join("")}`;
     } catch (e) {
       $("balance-now").textContent = "—";
       $("balance-now-note").textContent = "Проверьте данные";
@@ -345,7 +344,7 @@
       ? arr
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.actual ? "факт" : "план"} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
           )
           .join("")
       : '<div class="empty">Добавьте ближайшую зарплату или платёж.</div>';
@@ -376,7 +375,13 @@
   }
   function planFact(e) {
     const facts = e.actuals || [];
-    return `План: ${fmt(e.cents)}${facts.length ? " · Факт: " + facts.map((f) => `${labelDate(f.plannedDate)} → ${fmt(f.cents)} (${labelDate(f.date)})`).join("; ") : " · Факт не отмечен"}`;
+    if (e.paid) return "Учтено в начальной сумме";
+    if (e.repeat === "once" && facts.length)
+      return `Уже произошло: ${fmt(facts[0].cents)} · ${labelDate(facts[0].date)}`;
+    return `Запланировано: ${fmt(e.cents)}${facts.length ? " · Уже произошло: " + facts.map((f) => `${fmt(f.cents)} (${labelDate(f.date)})`).join("; ") : ""}`;
+  }
+  function displayedPayment(e) {
+    return e.repeat === "once" ? e.actuals?.[0] || e : e;
   }
   function operations() {
     const query = $("search-ops").value.trim().toLocaleLowerCase("ru-RU"),
@@ -390,12 +395,12 @@
               .toLocaleLowerCase("ru-RU")
               .includes(query)),
       )
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a, b) => displayedPayment(a).date.localeCompare(displayedPayment(b).date));
     $("ops").innerHTML = list.length
       ? list
           .map(
             (e) =>
-              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}${["expense", "repay"].includes(e.type) && (e.required ?? true) ? " · обязательный" : ""}</div><div class="entry-note">${planFact(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</b><button data-fact="${escape(e.id)}" ${e.paid ? "disabled" : ""}>Факт</button><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
+              `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(displayedPayment(e).date)} · ${category(e)} · ${e.repeat === "once" ? "разовая" : "повторяется"} ${e.paid ? "· уже учтена" : ""} · ${authorLabel(e)}${["expense", "repay"].includes(e.type) && (e.required ?? true) ? " · обязательный" : ""}</div><div class="entry-note">${planFact(e)}</div></div><div class="entry-actions"><b class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(displayedPayment(e).cents)}</b><button data-edit="${escape(e.id)}">Изменить</button><button data-delete="${escape(e.id)}" aria-label="Удалить ${escape(e.name)}">×</button></div></div>`,
           )
           .join("")
       : query || filter !== "all"
@@ -408,7 +413,7 @@
     $("days").innerHTML = p.daily
       .map(
         (x) =>
-          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "факт" : "план"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
+          `<div class="day"><button data-date="${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b></button><div class="detail" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
       )
       .join("");
   }
@@ -469,9 +474,10 @@
       : "Новая операция";
     $("event-name").value = e.name || "";
     $("event-type").value = e.type || "expense";
+    const payment = e.repeat === "once" ? e.actuals?.[0] : null;
     $("event-amount").value =
-      e.cents === undefined ? "" : (e.cents / 100).toFixed(2);
-    $("event-date").value = e.date || specified || state.start;
+      e.cents === undefined ? "" : ((payment?.cents ?? e.cents) / 100).toFixed(2);
+    $("event-date").value = payment?.date || e.date || specified || today();
     $("event-repeat").value = e.repeat || "once";
     $("event-end").value = e.end || "";
     $("event-confidence").value = e.confidence || "confirmed";
@@ -480,7 +486,77 @@
     $("event-required").checked =
       e.required ?? ["expense", "repay"].includes(e.type || "expense");
     $("event-salary").checked = e.salary ?? e.type === "income";
+    $("event-status").value = e.id
+      ? payment
+        ? "actual"
+        : "planned"
+      : $("event-date").value <= today()
+        ? "actual"
+        : "planned";
+    $("event-payment-planned").value = e.id
+      ? paymentDate(e)
+      : $("event-date").value;
+    fillPayment();
+    $("event-payment-records").innerHTML = (e.actuals || [])
+      .map((f) => `<div class="entry"><button type="button" data-payment-date="${f.plannedDate}">Платёж за ${labelDate(f.plannedDate)}</button><span>${fmt(f.cents)} · ${labelDate(f.date)}</span></div>`)
+      .join("");
     $("dialog").showModal();
+  }
+  function paymentDate(item) {
+    const day = today();
+    const dates = E.occurrences(
+      item,
+      item.date > state.start ? item.date : state.start,
+      E.shift(day > state.start ? day : state.start, 729),
+    );
+    const unpaid = dates.filter(
+      (d) => !(item.actuals || []).some((f) => f.plannedDate === d),
+    );
+    return unpaid.find((d) => d <= day) || unpaid[0] || item.actuals?.at(-1)?.plannedDate || item.date;
+  }
+  function paymentVisibility() {
+    const repeating = $("event-repeat").value !== "once";
+    $("event-payment").hidden = !repeating;
+    $("event-payment-values").hidden = !repeating || $("event-status").value !== "actual";
+    for (const id of ["event-payment-date", "event-payment-amount"])
+      $(id).required = !$("event-payment-values").hidden;
+    $("event-payment-planned").required = repeating;
+  }
+  function resetPaymentDate() {
+    const date = $("event-date").value;
+    const previous = editingEvent ? JSON.parse(editingEvent) : null;
+    const item = {
+      date,
+      repeat: $("event-repeat").value,
+      ...(previous?.days ? { days: previous.days } : {}),
+    };
+    $("event-payment-planned").value = date
+      ? E.occurrences(item, date, E.shift(date, 31))[0] || date
+      : "";
+    fillPayment();
+  }
+  function fillPayment() {
+    const item = editingEvent ? JSON.parse(editingEvent) : null;
+    const payment = item?.actuals?.find(
+      (f) => f.plannedDate === $("event-payment-planned").value,
+    );
+    if (item && $("event-repeat").value !== "once")
+      $("event-status").value = payment ? "actual" : "planned";
+    $("event-payment-date").value = payment?.date || today();
+    $("event-payment-amount").value = payment
+      ? (payment.cents / 100).toFixed(2)
+      : $("event-amount").value;
+    paymentVisibility();
+  }
+  function changePaymentStatus() {
+    if (editingEvent && $("event-repeat").value === "once") {
+      const item = JSON.parse(editingEvent);
+      const actual = $("event-status").value === "actual";
+      const payment = actual ? item.actuals?.[0] : null;
+      $("event-date").value = actual ? payment?.date || today() : item.date;
+      $("event-amount").value = ((payment?.cents ?? item.cents) / 100).toFixed(2);
+    }
+    paymentVisibility();
   }
   function saveEvent(ev) {
     ev.preventDefault();
@@ -503,7 +579,6 @@
       if (e.cents < 0) throw Error("Сумма должна быть неотрицательной");
       if ($("event-end").value) e.end = $("event-end").value;
       E.date(e.date);
-      if (e.end && e.end < e.date) throw Error("Дата окончания раньше начала");
       const idx = state.events.findIndex((v) => v.id === id);
       if (
         editingEvent &&
@@ -524,6 +599,29 @@
         e.actuals = state.events[idx].actuals;
       if (idx >= 0 && e.repeat === "twice" && state.events[idx].days)
         e.days = state.events[idx].days;
+      const occurred = $("event-status").value === "actual";
+      if (e.repeat === "once") {
+        const previous = idx >= 0 ? state.events[idx] : null;
+        const date = e.date, cents = e.cents;
+        // Keep the original plan; the completed payment replaces it in calculations.
+        if (occurred && previous?.repeat === "once") {
+          e.date = previous.date;
+          e.cents = previous.cents;
+        }
+        e.actuals = occurred ? [{ plannedDate: e.date, date, cents }] : [];
+      } else {
+        const plannedDate = $("event-payment-planned").value;
+        e.actuals = (e.actuals || []).filter((f) => f.plannedDate !== plannedDate);
+        if (occurred)
+          e.actuals.push({
+            plannedDate,
+            date: $("event-payment-date").value,
+            cents: E.money($("event-payment-amount").value),
+          });
+      }
+      if (e.end && e.end < e.date) throw Error("Дата окончания раньше начала");
+      if (occurred && (e.repeat === "once" ? $("event-date").value : $("event-payment-date").value) > today())
+        throw Error("Для будущей даты выберите «Запланировано». Деньги ещё не пришли и не потрачены.");
       if (idx < 0) events.push(e);
       else events[idx] = e;
       commit({ ...state, events });
@@ -580,61 +678,6 @@
         `<div class="loanmetrics"><div>Первый платёж<strong>${fmt(x.monthly)}</strong></div><div>Переплата<strong>${fmt(x.interest)}</strong></div><div>Всего выплат<strong>${fmt(x.total)}</strong></div></div><div class="loanscroll"><table><thead><tr><th>Месяц</th><th>Платёж</th><th>Проценты</th><th>Остаток</th></tr></thead><tbody>${x.schedule.map((v) => `<tr><td>${v.month}</td><td>${fmt(v.payment)}</td><td>${fmt(v.interest)}</td><td>${fmt(v.balance)}</td></tr>`).join("")}</tbody></table></div>`;
     } catch (e) {
       $("loan-result").textContent = e.message;
-    }
-  }
-  function openFact(item) {
-    editingFact = JSON.stringify(item);
-    $("fact-id").value = item.id;
-    $("fact-title").textContent = "Факт · " + item.name;
-    $("fact-error").textContent = "";
-    const dates = E.occurrences(item, state.start, E.shift(state.start, 729));
-    $("fact-planned").value =
-      dates.find(
-        (d) =>
-          d >= today() &&
-          !(item.actuals || []).some((f) => f.plannedDate === d),
-      ) || item.date;
-    fillFact();
-    $("fact-records").innerHTML = (item.actuals || [])
-      .map(
-        (f) =>
-          `<div class="entry"><button type="button" data-fact-date="${f.plannedDate}">${labelDate(f.plannedDate)} → ${labelDate(f.date)}</button><b>${fmt(f.cents)}</b></div>`,
-      )
-      .join("");
-    $("fact-dialog").showModal();
-  }
-  function fillFact() {
-    const item = state.events.find((e) => e.id === $("fact-id").value);
-    if (!item) return;
-    const f = (item.actuals || []).find(
-      (f) => f.plannedDate === $("fact-planned").value,
-    );
-    $("fact-date").value = f?.date || today();
-    $("fact-amount").value = ((f?.cents ?? item.cents) / 100).toFixed(2);
-  }
-  function saveFact(remove = false) {
-    try {
-      const item = state.events.find((e) => e.id === $("fact-id").value);
-      if (!item || JSON.stringify(item) !== editingFact)
-        throw Error("Операция изменилась. Откройте факт заново.");
-      const plannedDate = $("fact-planned").value;
-      const facts = (item.actuals || []).filter(
-        (f) => f.plannedDate !== plannedDate,
-      );
-      if (!remove)
-        facts.push({
-          plannedDate,
-          date: $("fact-date").value,
-          cents: E.money($("fact-amount").value),
-        });
-      const changed = { ...item, actuals: facts };
-      commit({
-        ...state,
-        events: state.events.map((e) => (e.id === item.id ? changed : e)),
-      });
-      $("fact-dialog").close();
-    } catch (e) {
-      $("fact-error").textContent = e.message;
     }
   }
   async function history() {
@@ -725,18 +768,25 @@
       themeLabel();
     };
     $("history-refresh").onclick = history;
-    $("fact-close").onclick = () => $("fact-dialog").close();
-    $("fact-planned").onchange = fillFact;
-    $("fact-form").onsubmit = (e) => {
-      e.preventDefault();
-      saveFact();
+    $("event-status").onchange = changePaymentStatus;
+    $("event-payment-planned").onchange = fillPayment;
+    $("event-repeat").onchange = () => {
+      resetPaymentDate();
     };
-    $("fact-remove").onclick = () => saveFact(true);
-    $("fact-records").onclick = (e) => {
-      const b = e.target.closest("[data-fact-date]");
-      if (b) {
-        $("fact-planned").value = b.dataset.factDate;
-        fillFact();
+    $("event-date").onchange = () => {
+      if (!editingEvent) {
+        $("event-status").value = $("event-date").value <= today() ? "actual" : "planned";
+        resetPaymentDate();
+      }
+    };
+    $("event-amount").oninput = () => {
+      if (!editingEvent) $("event-payment-amount").value = $("event-amount").value;
+    };
+    $("event-payment-records").onclick = (event) => {
+      const button = event.target.closest("[data-payment-date]");
+      if (button) {
+        $("event-payment-planned").value = button.dataset.paymentDate;
+        fillPayment();
       }
     };
     $("event-type").onchange = () => {
@@ -834,12 +884,11 @@
       }
     };
     $("ops").onclick = (e) => {
-      const b = e.target.closest("[data-edit],[data-delete],[data-fact]");
+      const b = e.target.closest("[data-edit],[data-delete]");
       if (!b) return;
-      const id = b.dataset.edit || b.dataset.delete || b.dataset.fact,
+      const id = b.dataset.edit || b.dataset.delete,
         item = state.events.find((x) => x.id === id);
       if (!item) return;
-      if (b.dataset.fact) openFact(item);
       else if (b.dataset.edit) openEvent(item);
       else if (confirm("Удалить операцию «" + item.name + "»?")) {
         try {
