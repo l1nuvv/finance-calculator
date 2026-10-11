@@ -1118,6 +1118,105 @@ th:first-child {
   }
 }
 /* Readable daily forecast with a persistent selected-day receipt. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.date-field {
+  display: flex;
+  min-width: 0;
+  position: relative;
+}
+.date-field input {
+  font-variant-numeric: tabular-nums;
+}
+.date-field:has(.date-trigger) > input {
+  padding-right: 48px;
+}
+.date-trigger {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  min-height: 40px;
+  width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.25rem;
+}
+.date-calendar {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(336px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 30px #0003;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.date-calendar-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 76px 32px;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.date-calendar-head button {
+  padding: 0;
+  font-size: 1.25rem;
+}
+.date-calendar-head :is(input, select) {
+  padding: 6px;
+  font-size: inherit;
+}
+.date-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+.date-calendar-grid > span {
+  color: var(--muted);
+  padding: 4px 0;
+}
+.date-calendar-grid button {
+  padding: 0;
+  min-height: 40px;
+  border-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.date-calendar-grid button[aria-current="date"] {
+  border-color: var(--focus);
+}
+.date-calendar-grid button.selected {
+  color: #fff;
+  background: var(--accent);
+}
+.date-calendar-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.date-calendar-foot button {
+  flex: 1;
+  padding: 6px;
+  font-size: 0.75rem;
+}
 #chart .chart-grid {
   stroke: var(--line);
   stroke-width: 1;

@@ -1,0 +1,14 @@
+const assert = require("node:assert/strict");
+const { format, parse } = require("./date-input.js");
+assert.equal(format("2026-10-12"), "12/10/2026");
+assert.equal(parse("12/10/2026"), "2026-10-12");
+assert.equal(parse("29/02/2024"), "2024-02-29");
+assert.equal(parse("29/02/2026"), "");
+assert.equal(parse("31/04/2026"), "");
+assert.equal(parse("01/13/2026"), "");
+assert.equal(parse("01/01/0000"), "");
+assert.equal(parse("01/01/0001"), "0001-01-01");
+assert.equal(parse(""), "");
+assert.equal(parse("2026-10-12"), "");
+assert.equal(format(""), "");
+console.log("Date input checks passed: day/month/year and invalid dates");
