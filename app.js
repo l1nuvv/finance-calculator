@@ -338,7 +338,10 @@
       : `По плану на ${horizon} дней денег хватает. Проверьте, что добавили все расходы и доходы.`;
     chart(p.daily);
     obligations();
-    let arr = p.events.filter((e) => e.type !== "transfer").slice(0, 8);
+    const arr = p.events
+      .filter((e) => e.type !== "transfer")
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 8);
     $("up-count").textContent = String(p.events.length) + " событий";
     $("upcoming").innerHTML = arr.length
       ? arr
@@ -395,7 +398,7 @@
               .toLocaleLowerCase("ru-RU")
               .includes(query)),
       )
-      .sort((a, b) => displayedPayment(a).date.localeCompare(displayedPayment(b).date));
+      .sort((a, b) => displayedPayment(b).date.localeCompare(displayedPayment(a).date));
     $("ops").innerHTML = list.length
       ? list
           .map(
