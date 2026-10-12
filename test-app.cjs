@@ -28,12 +28,12 @@ async function test(name, fn) { await fn(); count++; console.log("OK", name); }
     assert.equal(h.data().balance, 123400);
     assert.equal(h.$("ending").textContent, "1 234,00 ₽");
   });
-  await test("upcoming operations keep the nearest eight payments", () => {
+  await test("upcoming operations show the nearest eight payments newest first", () => {
     const h = setup(Array.from({ length: 10 }, (_, i) => event("payment-" + i, `2026-10-${10 + i}`)));
     h.tab("overview");
     const html = h.$("upcoming").innerHTML;
     const names = [...html.matchAll(/entry-title">([^<]+)/g)].map((match) => match[1]);
-    assert.deepEqual(names, Array.from({ length: 8 }, (_, i) => "payment-" + i));
+    assert.deepEqual(names, Array.from({ length: 8 }, (_, i) => "payment-" + (7 - i)));
   });
   await test("untrusted operation text is escaped in the rendered list", () => {
     const h = setup([event("xss", undefined, { name: '<img src=x onerror="bad()">', category: "<script>" })]);

@@ -352,7 +352,8 @@
     const arr = p.events
       .filter((e) => e.type !== "transfer")
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 8);
+      .slice(0, 8)
+      .reverse();
     $("up-count").textContent = String(p.events.length) + " событий";
     $("upcoming").innerHTML = arr.length
       ? arr
