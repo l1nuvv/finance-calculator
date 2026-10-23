@@ -8,7 +8,7 @@ const shell = {
   addAll: async (urls) =>
     urls.forEach((request) => {
       precached.push(request);
-      stored.set(request.url, { shell: true });
+      stored.set(request.url, { shell: true, text: async () => '<meta name="kontur-build" content="__BUILD__">' });
     }),
   match: async (request) =>
     stored.get(typeof request === "string" ? request : request.url),
@@ -50,7 +50,7 @@ vm.runInContext(fs.readFileSync("sw.js", "utf8"), context);
     },
   });
   await job;
-  assert.ok(stored.has("https://example.test/finance-calculator/index.html"));
+  assert.ok(stored.has("https://example.test/finance-calculator/index.html?kontur-build=__BUILD__"));
   assert.ok(precached.every((request) => request.cache === "reload"));
   handlers.activate({
     waitUntil: (p) => {
@@ -86,6 +86,11 @@ vm.runInContext(fs.readFileSync("sw.js", "utf8"), context);
     respondWith: (p) => { result = p; },
   });
   assert.equal((await result).fresh, true);
+  const originalMatch = shell.match;
+  shell.match = async () => ({ text: async () => '<meta name="kontur-build" content="old">' });
+  handlers.install({ waitUntil: (p) => { job = p; } });
+  await assert.rejects(job, /does not match/);
+  shell.match = originalMatch;
   for (const request of [
     { url: "https://cloud.example.test/auth/v1/token", method: "POST" },
     {
@@ -124,7 +129,7 @@ vm.runInContext(fs.readFileSync("sw.js", "utf8"), context);
 
 async function testUpdateUI() {
   const windowEvents = {}, documentEvents = {}, swEvents = {}, elements = new Map();
-  let reloads = 0, checks = 0, requests = 0, openDialog = false, offline = false;
+  let reloads = 0, checks = 0, requests = 0, openDialog = false, offline = false, release = "current", replaced;
   const element = (id) => {
     if (!elements.has(id)) elements.set(id, { hidden: true, textContent: "", querySelector: () => element("update-text") });
     return elements.get(id);
@@ -132,8 +137,15 @@ async function testUpdateUI() {
   const controller = { postMessage: () => { requests++; } };
   const registration = { update: async () => { checks++; if (offline) throw Error("offline"); } };
   const ui = {
-    Date, Promise, setTimeout, clearTimeout,
-    location: { reload: () => { reloads++; } },
+    Date, Promise, URL, AbortSignal, setTimeout, clearTimeout,
+    fetch: async (url, options) => {
+      assert.equal(new URL(url).pathname, "/finance-calculator/index.html");
+      assert.ok(new URL(url).searchParams.has("kontur-check"));
+      assert.equal(options.cache, "no-store");
+      if (offline) throw Error("offline");
+      return { ok: true, text: async () => `<meta name="kontur-build" content="${release}">` };
+    },
+    location: { href: "https://example.test/finance-calculator/", replace: (url) => { replaced = url; reloads++; } },
     matchMedia: () => ({ matches: true }),
     window: { addEventListener: (name, callback) => { windowEvents[name] = callback; } },
     document: {
@@ -166,12 +178,21 @@ async function testUpdateUI() {
   openDialog = false;
   element("apply-update").onclick();
   assert.equal(reloads, 1);
+  assert.equal(new URL(replaced).pathname, "/finance-calculator/index.html");
+  assert.equal(new URL(replaced).searchParams.get("kontur-build"), "next");
   await element("check-update").onclick();
   const before = checks;
   documentEvents.visibilitychange();
   assert.equal(checks, before, "Repeated background checks are throttled");
+  release = "server-newer";
+  await element("check-update").onclick();
+  assert.equal(element("app-update").hidden, false);
+  assert.match(element("update-note").textContent, /На сервере есть новая версия/);
+  version("current");
+  assert.equal(element("app-update").hidden, false, "An old cached worker must not hide a newer server release");
   offline = true;
   await element("check-update").onclick();
   assert.match(element("update-note").textContent, /Проверь интернет/);
+  assert.ok(!element("update-note").textContent.includes("последняя версия"));
   assert.equal(element("check-update").disabled, false);
 }

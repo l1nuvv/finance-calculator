@@ -255,14 +255,8 @@
     return projectValidated(data, horizon, scenario);
   }
   // Private helpers receive normalized data; public entry points always validate.
-  function projectValidated(data, horizon, scenario) {
-    if (!Number.isInteger(horizon) || horizon < 1 || horizon > 730)
-      throw Error("Горизонт 1–730 дней");
-    if (!["base", "conservative"].includes(scenario))
-      throw Error("Неверный сценарий");
-    const start = data.start,
-      end = shift(start, horizon - 1),
-      events = [];
+  function projectedEvents(data, start, end, scenario) {
+    const events = [];
     for (const e of data.events) {
       if (e.paid) continue;
       const facts = new Map((e.actuals || []).map((f) => [f.plannedDate, f]));
@@ -298,6 +292,25 @@
     events.sort(
       (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
     );
+    return events;
+  }
+  function upcoming(data, asOf, horizon = 30, scenario = "base") {
+    data = valid(data);
+    date(asOf);
+    if (!Number.isInteger(horizon) || horizon < 1 || horizon > 730)
+      throw Error("Горизонт 1–730 дней");
+    if (!["base", "conservative"].includes(scenario)) throw Error("Неверный сценарий");
+    return projectedEvents(data, asOf, shift(asOf, horizon - 1), scenario)
+      .filter((e) => !e.actual && e.type !== "transfer");
+  }
+  function projectValidated(data, horizon, scenario) {
+    if (!Number.isInteger(horizon) || horizon < 1 || horizon > 730)
+      throw Error("Горизонт 1–730 дней");
+    if (!["base", "conservative"].includes(scenario))
+      throw Error("Неверный сценарий");
+    const start = data.start,
+      end = shift(start, horizon - 1),
+      events = projectedEvents(data, start, end, scenario);
     let bal = data.balance,
       min = bal,
       minimumDate = start,
@@ -559,7 +572,7 @@
     };
   }
   return {
-    participants, eventPerson, setPersonalBalance, rebase,
+    participants, eventPerson, setPersonalBalance, rebase, upcoming,
     money,
     amount,
     date,

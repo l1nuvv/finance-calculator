@@ -30,7 +30,10 @@ vm.runInNewContext(read("sw.js").toString(), {
     addEventListener: (type, handler) => { handlers[type] = handler; },
     skipWaiting: async () => {},
   },
-  caches: { open: async () => ({ addAll: async (requests) => precached.push(...requests) }) },
+  caches: { open: async () => ({
+    addAll: async (requests) => precached.push(...requests),
+    match: async () => ({ text: async () => html }),
+  }) },
 });
 (async () => {
   let job;
@@ -43,6 +46,7 @@ vm.runInNewContext(read("sw.js").toString(), {
     assert.equal(url.origin + url.pathname.slice(0, url.pathname.lastIndexOf("/") + 1), base);
     assert.equal(request.cache, "reload");
     if (file !== "index.html") assert.equal(url.searchParams.get("v"), hash(file));
+    else assert.equal(url.searchParams.get("kontur-build"), build);
   }
   let reported;
   handlers.message({ data: { type: "KONTUR_VERSION" }, source: {

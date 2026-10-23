@@ -361,12 +361,9 @@
       : `По плану на ${horizon} дней денег хватает. Проверьте, что добавили все расходы и доходы.`;
     chart(p.daily);
     obligations();
-    const arr = p.events
-      .filter((e) => e.type !== "transfer")
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 8)
-      .reverse();
-    $("up-count").textContent = String(p.events.length) + " событий";
+    const upcoming = E.upcoming(state, today(), horizon, scenario);
+    const arr = upcoming.slice(0, 8);
+    $("up-count").textContent = `Показано ${arr.length} из ${upcoming.length} · от сегодня`;
     $("upcoming").innerHTML = arr.length
       ? arr
           .map(
@@ -374,7 +371,7 @@
               `<div class="entry"><div><div class="entry-title">${escape(e.name)}</div><div class="entry-note">${labelDate(e.date)} · ${category(e)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</div></div><div class="entry-value ${sign(e) === "+" ? "positive" : ""}">${sign(e)}${fmt(e.cents)}</div></div>`,
           )
           .join("")
-      : '<div class="empty">Добавьте ближайшую зарплату или платёж.</div>';
+      : `<div class="empty">На ближайшие ${horizon} дней запланированных платежей нет. Прошлые и уже выполненные операции доступны в разделе «Операции».</div>`;
   }
   function authorLabel(e) {
     return "Деньги: " + escape(E.participants(state)[E.eventPerson(state, e)].name) + " · " +
@@ -470,6 +467,10 @@
     if (active === "debts") debt();
     if (active === "history") history();
   }
+  window.addEventListener("focus", draw);
+  document.addEventListener?.("visibilitychange", () => {
+    if (document.visibilityState === "visible") draw();
+  });
   function tab(v) {
     if (v === "settings") fillPersonal();
     if (v !== "account") maybeAskMoney();

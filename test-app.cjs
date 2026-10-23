@@ -28,12 +28,32 @@ async function test(name, fn) { await fn(); count++; console.log("OK", name); }
     assert.equal(h.data().balance, 123400);
     assert.equal(h.$("ending").textContent, "1 234,00 ₽");
   });
-  await test("upcoming operations show the nearest eight payments newest first", () => {
+  await test("upcoming operations start today and show the nearest eight first", () => {
     const h = setup(Array.from({ length: 10 }, (_, i) => event("payment-" + i, `2026-10-${10 + i}`)));
     h.tab("overview");
     const html = h.$("upcoming").innerHTML;
     const names = [...html.matchAll(/entry-title">([^<]+)/g)].map((match) => match[1]);
-    assert.deepEqual(names, Array.from({ length: 8 }, (_, i) => "payment-" + (7 - i)));
+    assert.deepEqual(names, Array.from({ length: 8 }, (_, i) => "payment-" + (i + 1)));
+    assert.equal(h.$("up-count").textContent, "Показано 8 из 9 · от сегодня");
+    h.advance("2026-10-18"); h.tab("overview");
+    assert.ok(!h.$("upcoming").innerHTML.includes('entry-title">payment-7<'));
+    assert.match(h.$("upcoming").innerHTML, /entry-title">payment-8</);
+  });
+  await test("upcoming excludes completed payments and works beyond an old forecast end", () => {
+    const h = setup([
+      event("done", "2026-10-11", { actuals: [{ plannedDate: "2026-10-11", date: "2026-10-11", cents: 100 }] }),
+      event("today-plan"),
+      event("monthly", "2026-10-10", { repeat: "monthly" }),
+      event("own-transfer", "2026-11-12", { type: "transfer" }),
+    ]);
+    h.tab("overview");
+    assert.ok(!h.$("upcoming").innerHTML.includes("done"));
+    assert.match(h.$("upcoming").innerHTML, /today-plan/);
+    h.advance("2026-11-09"); h.tab("overview");
+    assert.match(h.$("upcoming").innerHTML, /monthly/);
+    assert.ok(!h.$("upcoming").innerHTML.includes("done"));
+    assert.ok(!h.$("upcoming").innerHTML.includes("own-transfer"));
+    assert.match(h.$("up-count").textContent, /1 из 1/);
   });
   await test("untrusted operation text is escaped in the rendered list", () => {
     const h = setup([event("xss", undefined, { name: '<img src=x onerror="bad()">', category: "<script>" })]);

@@ -3,18 +3,26 @@ const CACHE = "kontur-shell-__BUILD__";
 const BUILD = CACHE.slice("kontur-shell-".length);
 const PRECACHE = ["index.html"]; // BUILD_PRECACHE
 const base = new URL("./", self.location.href);
-const allowed = new Set(PRECACHE.map((path) => new URL(path, base).href));
+const shellURL = new URL("index.html?kontur-build=" + BUILD, base).href;
+const assetURL = (path) => path === "index.html" ? shellURL : new URL(path, base).href;
+const allowed = new Set(PRECACHE.map(assetURL));
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) =>
-        cache.addAll(
+      .then(async (cache) => {
+        await cache.addAll(
           PRECACHE.map((path) =>
-            new Request(new URL(path, base).href, { cache: "reload" }),
+            new Request(assetURL(path), { cache: "reload" }),
           ),
-        ),
-      )
+        );
+        const shell = await cache.match(shellURL);
+        const version = (await shell.text()).match(/name="kontur-build"\s+content="([^"]+)"/)?.[1];
+        if (version !== BUILD) {
+          await caches.delete(CACHE);
+          throw Error("Release HTML does not match the worker version");
+        }
+      })
       .then(() => self.skipWaiting()),
   );
 });
@@ -65,7 +73,7 @@ self.addEventListener("fetch", (event) => {
         .catch(() =>
           caches
             .open(CACHE)
-            .then((cache) => cache.match(new URL("index.html", base).href)),
+            .then((cache) => cache.match(shellURL)),
         ),
     );
     return;
