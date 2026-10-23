@@ -11,6 +11,13 @@ const html = read("index.html").toString();
 assert.ok(!html.includes("__BUILD__"), "Unresolved HTML build version");
 const build = html.match(/name="kontur-build" content="([a-f0-9]{16})"/)?.[1];
 assert.ok(build, "Missing HTML build version");
+const footerDate = html.match(/<time id="build-date" datetime="([^"]+)">([^<]+)<\/time>/);
+assert.ok(footerDate && Number.isFinite(Date.parse(footerDate[1])), "Missing footer build timestamp");
+const expectedDate = new Intl.DateTimeFormat("ru-RU", {
+  timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", year: "numeric",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+}).format(new Date(footerDate[1]));
+assert.equal(footerDate[2], `Собрано: ${expectedDate} МСК`, "Footer must show build time in Moscow");
 for (const file of files.filter((file) => /\.(js|css|png)$/.test(file) && file !== "sw.js")) {
   assert.ok(read(file).equals(fs.readFileSync(path.join(root, file))), "Asset differs from source: " + file);
   if (file !== "icon-512.png")

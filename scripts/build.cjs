@@ -11,6 +11,15 @@ for (const item of fs.readdirSync(out)) {
     throw Error("Unexpected file in deploy directory: " + item);
 }
 let html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const builtAt = new Date();
+const buildDate = new Intl.DateTimeFormat("ru-RU", {
+  timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", year: "numeric",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+}).format(builtAt);
+const datePlaceholder = '<time id="build-date">Локальная версия без даты публикации</time>';
+if (!html.includes(datePlaceholder)) throw Error("Missing footer build date placeholder");
+html = html.replace(datePlaceholder,
+  `<time id="build-date" datetime="${builtAt.toISOString()}">Собрано: ${buildDate} МСК</time>`);
 const versions = {};
 for (const file of files.filter(
   (file) => !["index.html", "sw.js", "manifest.webmanifest"].includes(file),
