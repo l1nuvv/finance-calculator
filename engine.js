@@ -255,13 +255,13 @@
     return projectValidated(data, horizon, scenario);
   }
   // Private helpers receive normalized data; public entry points always validate.
-  function projectedEvents(data, start, end, scenario) {
+  function projectedEvents(data, start, end, scenario, accountedThrough) {
     const events = [];
     for (const e of data.events) {
       if (e.paid) continue;
       const facts = new Map((e.actuals || []).map((f) => [f.plannedDate, f]));
       for (const f of facts.values()) {
-        if (f.date >= start && f.date <= end)
+        if (f.date >= start && f.date <= end && (!accountedThrough || f.date > accountedThrough))
           events.push({
             ...e,
             date: f.date,
@@ -303,14 +303,24 @@
     return projectedEvents(data, asOf, shift(asOf, horizon - 1), scenario)
       .filter((e) => !e.actual && e.type !== "transfer");
   }
-  function projectValidated(data, horizon, scenario) {
+  function projectCurrent(data, asOf, horizon = 30, scenario = "base", extras = []) {
+    data = valid(data);
+    date(asOf);
+    const balance = asOf < data.start ? data.balance : balanceNowValidated(data, asOf).balance;
+    const from = asOf < data.start ? data.start : asOf;
+    // Today's exact cash already includes completed payments; retain their facts
+    // to suppress the corresponding plans without charging them a second time.
+    const events = valid({ ...data, events: [...data.events, ...extras] }).events;
+    return projectValidated({ ...data, start: from, balance, events }, horizon, scenario, asOf);
+  }
+  function projectValidated(data, horizon, scenario, accountedThrough) {
     if (!Number.isInteger(horizon) || horizon < 1 || horizon > 730)
       throw Error("Горизонт 1–730 дней");
     if (!["base", "conservative"].includes(scenario))
       throw Error("Неверный сценарий");
     const start = data.start,
       end = shift(start, horizon - 1),
-      events = projectedEvents(data, start, end, scenario);
+      events = projectedEvents(data, start, end, scenario, accountedThrough);
     let bal = data.balance,
       min = bal,
       minimumDate = start,
@@ -572,7 +582,7 @@
     };
   }
   return {
-    participants, eventPerson, setPersonalBalance, rebase, upcoming,
+    participants, eventPerson, setPersonalBalance, rebase, upcoming, projectCurrent,
     money,
     amount,
     date,

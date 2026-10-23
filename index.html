@@ -131,7 +131,7 @@
             <div><span id="person-name-1">Второй участник</span><strong id="person-now-1">—</strong><small id="person-note-1"></small></div>
           </div>
           <p id="personal-note" class="footnote"></p>
-          <details class="balance-breakdown">
+          <details class="balance-breakdown" id="balance-breakdown">
             <summary>
               Как получился баланс · начальный остаток
               <strong id="current">—</strong>
@@ -142,8 +142,8 @@
               банка.
             </p>
           </details>
-          <div class="two">
-            <article class="panel wide">
+          <div class="two" id="forecast-layout">
+            <article class="panel wide" id="forecast-panel">
               <div class="panel-title">
                 <h2>Прогноз по дням</h2>
                 <span>По дням · ₽</span>
@@ -193,7 +193,7 @@
               расходы отметьте как «Уже произошло» в окне «Изменить».
             </p>
           </article>
-          <details class="panel comparison-panel">
+          <details class="panel comparison-panel" id="comparison-panel">
             <summary>Проверить: что будет, если взять в долг</summary>
             <p class="muted">
               Только для сравнения — операции не добавятся в бюджет.
@@ -203,9 +203,7 @@
                 >Дополнительный заём, ₽
                 <input
                   id="what-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text" inputmode="decimal"
                   value="10000" /></label
               ><label>Дата займа <input id="what-date" type="date" /></label
               ><label>Дата возврата <input id="what-repay" type="date" /></label
@@ -262,8 +260,7 @@
                   >Сумма кредита, ₽
                   <input
                     id="loan-p"
-                    type="number"
-                    min="0"
+                    type="text" inputmode="decimal"
                     value="200000" /></label
                 ><label
                   >Ставка, % годовых
@@ -289,7 +286,7 @@
                   </select></label
                 ><label
                   >Доплата ежемесячно, ₽
-                  <input id="loan-extra" type="number" min="0" value="0"
+                  <input id="loan-extra" type="text" inputmode="decimal" value="0"
                 /></label>
               </div>
               <button id="loan-calc" class="primary">Рассчитать</button>
@@ -444,8 +441,9 @@
               <div class="formgrid">
                 <label>Чьи деньги<select id="personal-person"><option value="0">Первый участник</option><option value="1">Второй участник</option></select></label>
                 <label>Имя<input id="personal-name" maxlength="80" required /></label>
-                <label>Свободные деньги сейчас, ₽<input id="personal-amount" type="number" min="0" step="0.01" inputmode="decimal" required /></label>
+                <label>Свободные деньги сейчас, ₽<input id="personal-amount" type="text" inputmode="decimal" placeholder="Например, 1234,56" aria-describedby="personal-amount-hint" required /></label>
               </div>
+              <p id="personal-amount-hint" class="footnote">Копейки можно отделить запятой или точкой: 1234,56 или 1234.56.</p>
               <p id="personal-error" class="error" role="alert"></p>
               <button class="primary" type="submit">Сохранить деньги участника</button>
               <p id="personal-saved" class="footnote" role="status"></p>
@@ -457,7 +455,7 @@
             <div class="formgrid">
               <label
                 >Начальный остаток, ₽
-                <input id="balance" type="number" step="0.01" /></label
+                <input id="balance" type="text" inputmode="decimal" /></label
               ><label
                 >Дата отсчёта <input id="setting-date" type="date"
               /></label>
@@ -774,7 +772,8 @@
         <p id="money-description" class="muted">Укажите точную сумму всех свободных денег, которые можно тратить: на картах и наличными. Будущую зарплату, накопления, которые не планируете тратить, и кредитный лимит не включайте.</p>
         <label>Кто вы в бюджете?<select id="money-person"><option value="0">Первый участник</option><option value="1">Второй участник</option></select></label>
         <label>Ваше имя<input id="money-name" maxlength="80" placeholder="Например, Данила" required autofocus /></label>
-        <label>Свободные деньги сейчас, ₽<input id="money-amount" type="number" min="0" step="0.01" inputmode="decimal" required /></label>
+        <label>Свободные деньги сейчас, ₽<input id="money-amount" type="text" inputmode="decimal" placeholder="Например, 1234,56" aria-describedby="money-amount-hint" required /></label>
+        <p id="money-amount-hint" class="footnote">Копейки можно отделить запятой или точкой: 1234,56 или 1234.56.</p>
         <p class="footnote">Например, 15 000 ₽ на карте и 2 000 ₽ наличными — укажите 17 000 ₽. Сумму можно исправить в «Настройки → Деньги участников». После сохранения это окно больше не появится для вашего аккаунта в этом бюджете.</p>
         <p id="money-error" class="error" role="alert"></p>
         <div class="dialogactions"><button id="money-later" type="button">Позже</button><button class="primary" type="submit">Сохранить сумму</button></div>
@@ -818,9 +817,7 @@
           ><label
             >Сумма, ₽<input
               id="event-amount"
-              type="number"
-              min="0"
-              step="0.01"
+              type="text" inputmode="decimal"
               required /></label
           ><label>Дата<input id="event-date" type="date" required /></label
           ><label
@@ -861,7 +858,7 @@
           <label>Платёж за дату<input id="event-payment-planned" type="date" /></label>
           <div id="event-payment-values" class="formgrid" hidden>
             <label>Когда деньги пришли или ушли<input id="event-payment-date" type="date" /></label>
-            <label>Сколько пришло или ушло, ₽<input id="event-payment-amount" type="number" min="0" step="0.01" /></label>
+            <label>Сколько пришло или ушло, ₽<input id="event-payment-amount" type="text" inputmode="decimal" /></label>
           </div>
           <div id="event-payment-records" class="entries"></div>
         </div>

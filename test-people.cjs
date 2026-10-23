@@ -106,4 +106,46 @@ test("stale settings cannot overwrite cash received from another device", () => 
   assert.match(h.$("personal-error").textContent, /изменились/);
   assert.equal(E.balanceNow(h.app.getState(), day).people[0].balance, 170000);
 });
+test("kopecks with comma or dot are saved exactly through intro and settings", () => {
+  const h = setup([], { raw: JSON.stringify(old) });
+  h.tab("overview");
+  h.$("money-name").value = "Анна"; h.$("money-amount").value = "1 234,56";
+  h.$("money-form").onsubmit({ preventDefault() {} });
+  assert.equal(h.$("money-error").textContent, "");
+  assert.equal(E.balanceNow(h.data(), day).people[0].balance, 123456);
+  h.tab("settings"); h.$("personal-person").value = "1"; h.$("personal-person").onchange();
+  h.$("personal-name").value = "Иван"; h.$("personal-amount").value = "2000.07";
+  h.$("personal-form").onsubmit({ preventDefault() {} });
+  assert.equal(E.balanceNow(h.data(), day).people[1].balance, 200007);
+  assert.equal(E.balanceNow(h.data(), day).balance, 323463);
+});
+test("incomplete shared cash shows no deficit or invented zero and becomes complete after entry", () => {
+  const partial = E.setPersonalBalance(old, 0, 100, day, "Анна");
+  const h = setup([], { raw: JSON.stringify(partial) });
+  h.tab("overview");
+  for (const id of ["balance-now", "minimum", "ending", "needed"])
+    assert.equal(h.$(id).textContent, "—");
+  assert.equal(h.$("person-now-1").textContent, "Не указано");
+  assert.equal(h.$("forecast-panel").hidden, true);
+  assert.equal(h.$("minimum").classList.contains("negative"), false);
+  assert.match(h.$("notice").textContent, /Прогноз появится/);
+  h.tab("calendar"); assert.ok(!h.$("days").innerHTML.includes('class="negative"'));
+  h.app.setState(E.setPersonalBalance(partial, 1, 200000, day, "Иван"));
+  h.tab("overview");
+  assert.equal(h.$("forecast-panel").hidden, false);
+  assert.equal(h.$("balance-now").textContent, E.amount(200100));
+  assert.equal(h.$("minimum").textContent, E.amount(200100));
+});
+test("current forecast ignores old unconfirmed plans and does not repeat today's facts", () => {
+  const data = personal();
+  data.events.push({ id: "old-plan", name: "Старый план", type: "expense", cents: 2025000, date: "2026-10-10" });
+  assert.ok(E.project(data, 30).min < 0);
+  const fromNow = E.projectCurrent(data, day, 30);
+  assert.equal(fromNow.start, day);
+  assert.equal(fromNow.min, 180000);
+  assert.equal(fromNow.final, 180000);
+  assert.equal(fromNow.events.length, 0);
+  data.events.push({ id: "future-plan", name: "Будущий платёж", type: "expense", cents: 40000, date: "2026-10-12" });
+  assert.equal(E.projectCurrent(data, day, 30).min, 140000);
+});
 console.log(count + " participant budget tests passed");

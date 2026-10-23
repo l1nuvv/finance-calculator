@@ -178,10 +178,13 @@
     if (
       !current ||
       current.data !== data ||
+      current.asOf !== today() ||
       current.horizon !== horizon ||
       current.scenario !== scenario
     )
-      current = { data, horizon, scenario, result: E.project(data, horizon, scenario) };
+      current = { data, horizon, scenario, asOf: today(), result: data.people
+        ? E.projectCurrent(data, today(), horizon, scenario)
+        : E.project(data, horizon, scenario) };
     return current.result;
   }
   function recalculation() {
@@ -307,19 +310,21 @@
       const people = a.people || E.participants(state);
       people.forEach((p, i) => {
         $("person-name-" + i).textContent = p.name;
-        $("person-now-" + i).textContent = a.balance === null ? "—" : fmt(p.balance);
+        $("person-now-" + i).textContent = state.people && !p.ready ? "Не указано" : a.balance === null ? "—" : fmt(p.balance);
         $("person-note-" + i).textContent = p.ready ? "С учётом отмеченных операций" : "Сумма пока не уточнена";
       });
       $("personal-note").textContent = people.every((p) => p.ready)
         ? `Общие деньги = ${people[0].name} + ${people[1].name}.`
         : "Уточните деньги каждого в настройках. До уточнения прежний общий остаток и старые операции без владельца относятся к первому участнику. В операции можно изменить, чьи это деньги.";
-      $("balance-now").textContent = a.balance === null ? "—" : fmt(a.balance);
+      const pending = budgetPending();
+      $("balance-now").textContent = pending || a.balance === null ? "—" : fmt(a.balance);
       $("balance-now").classList.toggle(
         "negative",
-        a.balance !== null && a.balance < 0,
+        !pending && a.balance !== null && a.balance < 0,
       );
       $("balance-now-note").textContent =
-        a.balance === null
+        pending ? "Укажите деньги обоих участников"
+        : a.balance === null
           ? "Начальная дата ещё не наступила"
           : `На ${labelDate(a.date)} · только отмеченные платежи`;
       $("balance-calculation").innerHTML =
@@ -331,6 +336,9 @@
       $("balance-now-note").textContent = "Проверьте данные";
       $("balance-calculation").textContent = e.message;
     }
+  }
+  function budgetPending() {
+    return !!state.people && state.people.some((p) => !p.ready);
   }
 
   let chartFrame;
@@ -345,6 +353,11 @@
     if (!p) return;
     $("current").textContent = fmt(state.balance);
     actualBalance();
+    const pending = budgetPending();
+    $("forecast-layout").classList.toggle("pending", pending);
+    $("forecast-panel").hidden = pending;
+    $("balance-breakdown").hidden = pending;
+    $("comparison-panel").hidden = pending;
     $("minimum").textContent = fmt(p.min);
     $("minimum").classList.toggle("negative", p.min < 0);
     $("min-date").textContent = "Минимум: " + labelDate(p.minimumDate);
@@ -359,7 +372,16 @@
     $("notice").textContent = p.needed
       ? `По плану с ${labelDate(p.firstNegative)} не хватает денег. Нужно ещё ${fmt(p.needed)}, чтобы пройти весь период без минуса.`
       : `По плану на ${horizon} дней денег хватает. Проверьте, что добавили все расходы и доходы.`;
-    chart(p.daily);
+    if (pending) {
+      for (const id of ["minimum", "ending", "needed"]) {
+        $(id).textContent = "—";
+        $(id).classList.remove("negative");
+      }
+      for (const id of ["min-date", "end-date", "gap-date"])
+        $(id).textContent = "Недостаточно данных";
+      $("notice").className = "notice";
+      $("notice").textContent = "Прогноз появится, когда оба участника укажут свои деньги. Пока общая сумма неизвестна. Укажите недостающую сумму в своём аккаунте или в разделе «Настройки → Деньги участников».";
+    } else chart(p.daily);
     obligations();
     const upcoming = E.upcoming(state, today(), horizon, scenario);
     const arr = upcoming.slice(0, 8);
@@ -378,6 +400,12 @@
       (e.author ? "Добавил(а): " + escape(e.author) : "Автор не указан");
   }
   function obligations() {
+    if (budgetPending()) {
+      $("obligations-period").textContent = "Ждём суммы обоих участников";
+      $("obligations-summary").textContent = "Пока не указаны деньги обоих участников, нельзя точно посчитать общий остаток после платежей.";
+      $("obligations-list").replaceChildren();
+      return;
+    }
     try {
       const x = E.obligations(state, today());
       $("obligations-period").textContent = x.nextIncome
@@ -440,7 +468,7 @@
     $("days").innerHTML = p.daily
       .map(
         (x) =>
-          `<div class="day"><button data-date="${x.date}" aria-expanded="false" aria-controls="day-${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${x.closing < 0 ? "negative" : ""}">${fmt(x.closing)}</b><span class="day-chevron" aria-hidden="true">›</span></button><div class="detail" id="day-${x.date}" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
+          `<div class="day"><button data-date="${x.date}" aria-expanded="false" aria-controls="day-${x.date}"><span>${labelDate(x.date)}</span><span>${x.events.length ? x.events.length + " опер." : "Без операций"}</span><b class="${!budgetPending() && x.closing < 0 ? "negative" : ""}">${budgetPending() ? "—" : fmt(x.closing)}</b><span class="day-chevron" aria-hidden="true">›</span></button><div class="detail" id="day-${x.date}" data-detail="${x.date}" hidden>${x.events.map((e) => `<p>${escape(e.name)} · ${sign(e)}${fmt(e.cents)} · ${e.actual ? "уже произошло" : "запланировано"} · ${authorLabel(e)}</p>`).join("") || "<p>На этот день операций нет.</p>"}<button data-newdate="${x.date}">+ Добавить сюда</button></div></div>`,
       )
       .join("");
   }
@@ -666,6 +694,7 @@
   }
   function comparison() {
     try {
+      if (budgetPending()) throw Error("Сначала укажите деньги обоих участников в настройках.");
       const cents = E.money($("what-amount").value),
         d = $("what-date").value,
         r = $("what-repay").value;
@@ -694,7 +723,8 @@
           },
         ],
         base = forecast(),
-        alt = E.project(state, horizon, scenario, extras);
+        alt = state.people ? E.projectCurrent(state, today(), horizon, scenario, extras)
+          : E.project(state, horizon, scenario, extras);
       $("comparison").innerHTML =
         `<div class="comp"><span>Без займа: минимум <strong>${fmt(base.min)}</strong></span><span>С займом: минимум <strong>${fmt(alt.min)}</strong></span><span>Необходимо покрыть: <strong>${fmt(alt.needed)}</strong></span><span>Остаток на ${labelDate(alt.end)}: <strong>${fmt(alt.final)}</strong></span></div><p class="footnote">Это пробный сценарий. Он не изменил основной бюджет. Заём не учитывается как заработанный доход.</p>`;
     } catch (e) {

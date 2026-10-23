@@ -329,6 +329,7 @@ nav button:hover {
   margin-bottom: 24px;
   align-items: start;
 }
+#forecast-layout.pending { grid-template-columns: minmax(0, 1fr); }
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
