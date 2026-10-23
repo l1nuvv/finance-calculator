@@ -69,6 +69,21 @@
     date(x.start);
     if (!Number.isSafeInteger(x.balance) || Math.abs(x.balance) > MAX)
       throw Error("Неверный баланс");
+    if (x.people !== undefined) {
+      if (!Array.isArray(x.people) || x.people.length !== 2)
+        throw Error("В бюджете должно быть два участника");
+      for (const p of x.people) {
+        if (!p || typeof p.name !== "string" || !p.name.trim() || p.name.length > 80 ||
+            !Number.isSafeInteger(p.balance) || Math.abs(p.balance) > MAX ||
+            typeof p.ready !== "boolean" ||
+            (p.login !== undefined && (typeof p.login !== "string" || !/^[a-z0-9_-]{3,32}$/.test(p.login))))
+          throw Error("Неверные данные участника");
+      }
+      if (add(x.people[0].balance, x.people[1].balance) !== x.balance)
+        throw Error("Общий остаток должен равняться сумме денег участников");
+      if (x.people[0].login && x.people[0].login === x.people[1].login)
+        throw Error("Выберите разные аккаунты участников");
+    }
     if (x.events.length > 5000) throw Error("Слишком много операций");
     const ids = new Set();
     for (const e of x.events) {
@@ -98,6 +113,7 @@
         (e.category !== undefined &&
           (typeof e.category !== "string" || e.category.length > 40)) ||
         (e.paid !== undefined && typeof e.paid !== "boolean") ||
+        (e.person !== undefined && ![0, 1].includes(e.person)) ||
         (e.author !== undefined &&
           (typeof e.author !== "string" ||
             !/^[a-z0-9_-]{3,32}$/.test(e.author))) ||
@@ -145,6 +161,8 @@
       version: 1,
       start: x.start,
       balance: x.balance,
+      ...(x.people ? { people: x.people.map((p) => ({ name: p.name.trim(), balance: p.balance, ready: p.ready,
+        ...(p.login ? { login: p.login } : {}) })) } : {}),
       events: x.events
         .map((e) => ({
           id: e.id,
@@ -157,6 +175,7 @@
           category: e.category ?? "",
           paid: e.paid ?? false,
           ...(e.author !== undefined ? { author: e.author } : {}),
+          ...(e.person !== undefined ? { person: e.person } : {}),
           ...(e.required !== undefined ? { required: e.required } : {}),
           ...(e.salary !== undefined ? { salary: e.salary } : {}),
           ...(e.actuals !== undefined
@@ -396,13 +415,13 @@
     data = valid(data);
     if (entry.event_id === null) {
       if (
-        JSON.stringify([data.start, data.balance]) !==
-        JSON.stringify([entry.after.start, entry.after.balance])
+        JSON.stringify([data.start, data.balance, data.people]) !==
+        JSON.stringify([entry.after.start, entry.after.balance, entry.after.people])
       )
         throw Error(
           "Остаток или дата изменились после этой записи. Отмена остановлена.",
         );
-      return valid({ ...data, ...entry.before });
+      return valid({ ...data, ...entry.before, people: entry.before.people });
     }
     const current = data.events.find((e) => e.id === entry.event_id) || null;
     const canonical = (e) =>
@@ -440,11 +459,14 @@
     let balance = data.balance,
       received = 0,
       spent = 0;
-    const events = [];
+    const events = [], people = participants(data);
     for (const e of data.events) {
       if (e.paid || e.type === "transfer") continue;
       for (const f of e.actuals || []) {
         if (f.date < data.start || f.date > asOf) continue;
+        const person = eventPerson(data, e);
+        people[person].balance = add(people[person].balance,
+          ["income", "borrow"].includes(e.type) ? f.cents : -f.cents);
         if (["income", "borrow"].includes(e.type)) {
           received = add(received, f.cents);
           balance = add(balance, f.cents);
@@ -458,7 +480,43 @@
     events.sort(
       (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
     );
-    return { balance, received, spent, events, date: asOf, start: data.start };
+    return { balance, people, received, spent, events, date: asOf, start: data.start };
+  }
+  function participants(data) {
+    return data.people ? data.people.map((p) => ({ ...p })) : [
+      { name: "Первый участник", balance: data.balance, ready: false },
+      { name: "Второй участник", balance: 0, ready: false },
+    ];
+  }
+  function eventPerson(data, e) {
+    if (e.person !== undefined) return e.person;
+    const index = data.people?.findIndex((p) => p.login && p.login === e.author) ?? -1;
+    return index < 0 ? 0 : index;
+  }
+  // Enter today's exact amount without counting already recorded payments twice.
+  function setPersonalBalance(data, index, cents, asOf, name, login) {
+    data = valid(data);
+    if (![0, 1].includes(index) || !Number.isSafeInteger(cents) || cents < 0 || cents > MAX)
+      throw Error("Укажите сумму от 0 до 10 миллиардов рублей");
+    const current = balanceNow(data, asOf);
+    if (current.balance === null) throw Error("Дата отсчёта в будущем. Исправьте её в настройках.");
+    const people = participants(data);
+    // Freeze ownership of legacy entries before attaching an account to a slot.
+    const events = data.events.map((e) => ({ ...e, person: eventPerson(data, e) }));
+    people[index] = { ...people[index], name, ready: true,
+      balance: add(people[index].balance, cents - current.people[index].balance),
+      ...(login ? { login } : {}) };
+    return valid({ ...data, people, events, balance: add(people[0].balance, people[1].balance) });
+  }
+  function rebase(data, start, asOf) {
+    data = valid(data);
+    date(start); date(asOf);
+    if (start < data.start || start > asOf)
+      throw Error("Выберите дату от текущего начала расчёта до сегодняшнего дня.");
+    if (start === data.start) return data;
+    const actual = balanceNow(data, shift(start, -1));
+    return valid({ ...data, start, balance: actual.balance,
+      ...(data.people ? { people: actual.people } : {}) });
   }
   function obligations(data, asOf) {
     data = valid(data);
@@ -501,6 +559,7 @@
     };
   }
   return {
+    participants, eventPerson, setPersonalBalance, rebase,
     money,
     amount,
     date,

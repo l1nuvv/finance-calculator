@@ -58,6 +58,7 @@
           base: this.base,
           local: this.getData(),
           revision: this.revision,
+          owner: this.remote.owner,
         }),
       );
     }
@@ -123,7 +124,7 @@
           id: key.slice(prefix.length),
           data: cached.base,
           revision: cached.revision,
-          owner: false,
+          owner: typeof cached.owner === "boolean" ? cached.owner : null,
           members: 2,
         });
         this.status("Без связи с облаком · открыта сохранённая копия", true);
@@ -241,8 +242,9 @@
           value === undefined
             ? "Удалено"
             : Array.isArray(value)
-              ? KonturBudgetCopy.date(value[0]) + ", " + E.amount(value[1])
-              : KonturBudgetCopy.describeEvent(value);
+              ? KonturBudgetCopy.date(value[0]) + ", " + E.amount(value[1]) +
+                (value[2] ? "\n" + value[2].map((p) => p.name + ": " + E.amount(p.balance)).join("\n") : "")
+              : KonturBudgetCopy.describeEvent(value, this.getData());
         versions.textContent =
           "На устройстве:\n" +
           describe(conflict.local) +

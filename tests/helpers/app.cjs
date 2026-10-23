@@ -74,7 +74,7 @@ module.exports = function setup(events = [], options = {}) {
     setState: (data) => shared.onData(E.valid(data)), getState: () => shared.getData(),
   };
   return {
-    app, $, stored, advance: (value) => { day = value; },
+    app, $, stored, shared: () => shared, advance: (value) => { day = value; },
     save: () => app.saveEvent({ preventDefault() {} }),
     data: () => JSON.parse(stored.get("kontur:budget:v1")),
     tab: (id) => $("nav-" + id).onclick(),

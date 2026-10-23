@@ -109,7 +109,7 @@
           <div id="notice" class="notice"></div>
           <div class="stats">
             <div class="stat focus">
-              <div>Баланс сейчас</div>
+              <div>Общие деньги сейчас</div>
               <strong id="balance-now">—</strong
               ><small id="balance-now-note">По отмеченным платежам</small>
             </div>
@@ -126,6 +126,11 @@
               <strong id="needed">—</strong><small id="gap-date">—</small>
             </div>
           </div>
+          <div class="personal-balances" aria-label="Деньги участников">
+            <div><span id="person-name-0">Первый участник</span><strong id="person-now-0">—</strong><small id="person-note-0"></small></div>
+            <div><span id="person-name-1">Второй участник</span><strong id="person-now-1">—</strong><small id="person-note-1"></small></div>
+          </div>
+          <p id="personal-note" class="footnote"></p>
           <details class="balance-breakdown">
             <summary>
               Как получился баланс · начальный остаток
@@ -432,7 +437,22 @@
             </p>
           </article>
           <article class="panel">
+            <h2>Деньги участников</h2>
+            <p class="muted">Общие деньги — сумма денег двух участников. Укажите свободные деньги на сегодня: на картах и наличными. Например, 15 000 ₽ на карте и 2 000 ₽ наличными — это 17 000 ₽. Будущую зарплату и кредитный лимит не включайте.</p>
+            <form id="personal-form">
+              <div class="formgrid">
+                <label>Чьи деньги<select id="personal-person"><option value="0">Первый участник</option><option value="1">Второй участник</option></select></label>
+                <label>Имя<input id="personal-name" maxlength="80" required /></label>
+                <label>Свободные деньги сейчас, ₽<input id="personal-amount" type="number" min="0" step="0.01" inputmode="decimal" required /></label>
+              </div>
+              <p id="personal-error" class="error" role="alert"></p>
+              <button class="primary" type="submit">Сохранить деньги участника</button>
+              <p id="personal-saved" class="footnote" role="status"></p>
+            </form>
+          </article>
+          <article class="panel">
             <h2>Деньги на начало расчёта</h2>
+            <p id="snapshot-note" class="footnote">После разделения денег общий остаток на начало рассчитывается из сумм участников. Текущие суммы меняйте в форме выше. Дату отсчёта можно перенести вперёд до сегодняшнего дня: отмеченные платежи до неё войдут в начальные суммы.</p>
             <div class="formgrid">
               <label
                 >Начальный остаток, ₽
@@ -746,7 +766,19 @@
         </footer>
       </main>
     </div>
-    <dialog id="dialog">
+    <dialog id="money-dialog" aria-labelledby="money-title" aria-describedby="money-description">
+      <form id="money-form">
+        <div class="dialoghead"><h2 id="money-title">Сколько денег у вас сейчас?</h2></div>
+        <p id="money-description" class="muted">Укажите точную сумму всех свободных денег, которые можно тратить: на картах и наличными. Будущую зарплату, накопления, которые не планируете тратить, и кредитный лимит не включайте.</p>
+        <label>Кто вы в бюджете?<select id="money-person"><option value="0">Первый участник</option><option value="1">Второй участник</option></select></label>
+        <label>Ваше имя<input id="money-name" maxlength="80" placeholder="Например, Данила" required autofocus /></label>
+        <label>Свободные деньги сейчас, ₽<input id="money-amount" type="number" min="0" step="0.01" inputmode="decimal" required /></label>
+        <p class="footnote">Например, 15 000 ₽ на карте и 2 000 ₽ наличными — укажите 17 000 ₽. Сумму можно исправить в «Настройки → Деньги участников». После сохранения это окно больше не появится для вашего аккаунта в этом бюджете.</p>
+        <p id="money-error" class="error" role="alert"></p>
+        <div class="dialogactions"><button id="money-later" type="button">Позже</button><button class="primary" type="submit">Сохранить сумму</button></div>
+      </form>
+    </dialog>
+    <dialog id="dialog" aria-labelledby="dialog-title">
       <form id="event-form">
         <div class="dialoghead">
           <h2 id="dialog-title">Новая операция</h2>
@@ -766,6 +798,7 @@
         </select></label>
         <p class="footnote">Покупку или полученную зарплату можно записать сразу. Для будущего платежа выберите «Запланировано».</p>
         <div class="formgrid">
+          <label>Чьи деньги<select id="event-person"><option value="0">Первый участник</option><option value="1">Второй участник</option></select></label>
           <label
             >Название<input
               id="event-name"

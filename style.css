@@ -295,6 +295,7 @@ nav button:hover {
   border-left: 0;
 }
 .stat div {
+  overflow-wrap: anywhere;
   font-size: 0.75rem;
   color: var(--muted);
 }
@@ -1324,6 +1325,18 @@ th:first-child {
   color: var(--ink);
   font-weight: 600;
 }
+.personal-balances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.personal-balances > div { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.personal-balances span, .personal-balances strong, .personal-balances small { display: block; overflow-wrap: anywhere; }
+.personal-balances strong { font-size: 1.25rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.personal-balances small { color: var(--muted); line-height: 1.5; }
+#money-dialog label { margin-top: 12px; }
+@media (max-width: 420px) { .personal-balances { grid-template-columns: 1fr; gap: 0; } }
 .balance-equation {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -21,7 +21,10 @@
     shared = null,
     editingEvent = null,
     localHistory = [],
-    historyEpoch = 0;
+    historyEpoch = 0,
+    personalBasis = null,
+    moneyBasis = null;
+  const moneyDismissed = new Set();
   const today = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -98,11 +101,11 @@
             action: !a ? "create" : !b ? "delete" : "update",
           });
       }
-      if (state.start !== checked.start || state.balance !== checked.balance)
+      if (JSON.stringify([state.start, state.balance, state.people]) !== JSON.stringify([checked.start, checked.balance, checked.people]))
         changes.push({
           event_id: null,
-          before: { start: state.start, balance: state.balance },
-          after: { start: checked.start, balance: checked.balance },
+          before: { start: state.start, balance: state.balance, ...(state.people ? { people: state.people } : {}) },
+          after: { start: checked.start, balance: checked.balance, ...(checked.people ? { people: checked.people } : {}) },
           action: "snapshot",
         });
       localHistory = [
@@ -301,6 +304,15 @@
   function actualBalance() {
     try {
       const a = E.balanceNow(state, today());
+      const people = a.people || E.participants(state);
+      people.forEach((p, i) => {
+        $("person-name-" + i).textContent = p.name;
+        $("person-now-" + i).textContent = a.balance === null ? "—" : fmt(p.balance);
+        $("person-note-" + i).textContent = p.ready ? "С учётом отмеченных операций" : "Сумма пока не уточнена";
+      });
+      $("personal-note").textContent = people.every((p) => p.ready)
+        ? `Общие деньги = ${people[0].name} + ${people[1].name}.`
+        : "Уточните деньги каждого в настройках. До уточнения прежний общий остаток и старые операции без владельца относятся к первому участнику. В операции можно изменить, чьи это деньги.";
       $("balance-now").textContent = a.balance === null ? "—" : fmt(a.balance);
       $("balance-now").classList.toggle(
         "negative",
@@ -365,7 +377,8 @@
       : '<div class="empty">Добавьте ближайшую зарплату или платёж.</div>';
   }
   function authorLabel(e) {
-    return e.author ? "Добавил(а): " + escape(e.author) : "Автор не указан";
+    return "Деньги: " + escape(E.participants(state)[E.eventPerson(state, e)].name) + " · " +
+      (e.author ? "Добавил(а): " + escape(e.author) : "Автор не указан");
   }
   function obligations() {
     try {
@@ -458,6 +471,8 @@
     if (active === "history") history();
   }
   function tab(v) {
+    if (v === "settings") fillPersonal();
+    if (v !== "account") maybeAskMoney();
     document.querySelectorAll(".tab").forEach((n) => (n.hidden = n.id !== v));
     document.querySelectorAll("nav button").forEach((n) => {
       const selected = n.dataset.tab === v;
@@ -491,6 +506,7 @@
       : "Новая операция";
     $("event-name").value = e.name || "";
     $("event-type").value = e.type || "expense";
+    $("event-person").value = String(e.id ? E.eventPerson(state, e) : myPerson());
     const payment = e.repeat === "once" ? e.actuals?.[0] : null;
     $("event-amount").value =
       e.cents === undefined ? "" : ((payment?.cents ?? e.cents) / 100).toFixed(2);
@@ -590,6 +606,7 @@
           paid: $("event-paid").checked,
           required: $("event-required").checked,
           salary: $("event-salary").checked,
+          person: Number($("event-person").value),
         };
       if (!e.name) throw Error("Введите название");
       if (e.cents < 0) throw Error("Сумма должна быть неотрицательной");
@@ -727,8 +744,8 @@
               !value
                 ? "Нет записи"
                 : e.event_id === null
-                  ? `${fmt(value.balance)} · ${labelDate(value.start)}`
-                  : escape(KonturBudgetCopy.describeEvent(value));
+                  ? `${fmt(value.balance)} · ${labelDate(value.start)}${value.people ? " · " + value.people.map((p) => escape(p.name) + ": " + fmt(p.balance)).join("; ") : ""}`
+                  : escape(KonturBudgetCopy.describeEvent(value, state));
             const name = e.event_id === null ? "Остаток и дата" : e.after?.name || e.before?.name || "Операция";
             return `<div class="entry history-entry"><div><div class="entry-title">${e.undo_of ? "Отмена: " : ""}${label}</div><div class="entry-note">${escape(e.actor)} · ${escape(new Date(e.created_at).toLocaleString("ru-RU"))}</div><details class="history-versions"><summary>${escape(name)}: посмотреть изменения</summary><div class="entry-note operation-description">Было: ${describe(e.before)}</div><div class="entry-note operation-description">Стало: ${describe(e.after)}</div></details></div><button data-undo="${escape(e.id)}">Отменить</button></div>`;
           })
@@ -848,7 +865,7 @@
     $("loan-calc").onclick = loanCalc;
     $("apply").onclick = () => {
       try {
-        commit({
+        commit(state.people ? E.rebase(state, $("setting-date").value, today()) : {
           ...state,
           balance: E.money($("balance").value),
           start: $("setting-date").value,
@@ -860,6 +877,15 @@
         alert(e.message);
       }
     };
+    $("personal-person").onchange = fillPersonal;
+    $("money-person").onchange = fillMoney;
+    $("personal-form").onsubmit = (event) => savePersonal(event, false);
+    $("money-form").onsubmit = (event) => savePersonal(event, true);
+    $("money-later").onclick = dismissMoney;
+    $("money-dialog").addEventListener("cancel", (event) => {
+      event.preventDefault();
+      dismissMoney();
+    });
     $("export").onclick = () => {
       downloadJSON(
         JSON.stringify(state, null, 2),
@@ -934,7 +960,88 @@
       b.setAttribute("aria-expanded", String(!d.hidden));
     };
   }
+  function loginName() {
+    return shared?.active ? shared.client.user.email.split("@")[0].toLowerCase() : null;
+  }
+  function myPerson() {
+    const login = loginName(), people = E.participants(state);
+    const found = login ? people.findIndex((p) => p.login === login) : -1;
+    return found >= 0 ? found : shared?.active && !shared.remote?.owner ? 1 : 0;
+  }
+  function moneyKey() {
+    return "kontur:money-intro:v1:" + (shared?.active ? shared.remote.id + ":" + shared.client.user.id : "local");
+  }
+  function personalVersion(index) {
+    const actual = E.balanceNow(state, today());
+    return JSON.stringify([today(), state.start, actual.people?.[index] || E.participants(state)[index]]);
+  }
+  function fillPersonal() {
+    const index = Number($("personal-person").value || 0);
+    const p = (E.balanceNow(state, today()).people || E.participants(state))[index];
+    $("personal-name").value = p.name;
+    $("personal-amount").value = (p.balance / 100).toFixed(2);
+    $("personal-error").textContent = "";
+    personalBasis = personalVersion(index);
+  }
+  function fillMoney() {
+    const index = Number($("money-person").value || 0), p = E.participants(state)[index];
+    $("money-name").value = p.ready ? p.name : "";
+    $("money-amount").value = "";
+    moneyBasis = personalVersion(index);
+  }
+  function maybeAskMoney() {
+    if (readBlocked || !shared || (shared.client.user && !shared.active) || $("money-dialog").open || $("dialog").open) return;
+    // Old offline caches do not identify the owner's slot; wait for a server read.
+    if (shared.active && shared.remote.owner === null && !E.participants(state).some((p) => p.login === loginName())) return;
+    const index = myPerson(), p = E.participants(state)[index], key = moneyKey();
+    if (p.ready && (!loginName() || p.login === loginName())) return;
+    if (moneyDismissed.has(key)) return;
+    try { if (localStorage.getItem(key)) return; } catch {}
+    $("money-person").value = String(index);
+    $("money-person").disabled = !!shared.active;
+    $("money-error").textContent = "";
+    fillMoney();
+    $("money-dialog").showModal();
+  }
+  function dismissMoney() {
+    const key = moneyKey();
+    moneyDismissed.add(key);
+    try { localStorage.setItem(key, "seen"); } catch {}
+    $("money-dialog").close();
+  }
+  function savePersonal(event, intro) {
+    event.preventDefault();
+    const prefix = intro ? "money" : "personal";
+    try {
+      const index = Number($(prefix + "-person").value);
+      if ((intro ? moneyBasis : personalBasis) !== personalVersion(index)) {
+        if (intro) fillMoney(); else fillPersonal();
+        throw Error("Деньги участника изменились. Проверьте новую сумму и введите актуальную ещё раз.");
+      }
+      const login = intro || index === myPerson() ? loginName() : undefined;
+      if (intro && shared?.active && index !== myPerson()) throw Error("Откройте окно заново для своего аккаунта.");
+      const name = $(prefix + "-name").value.trim();
+      if (!name) throw Error("Введите имя участника");
+      commit(E.setPersonalBalance(state, index, E.money($(prefix + "-amount").value), today(), name, login));
+      if (!shared?.active && !storageOK) throw Error("Не удалось сохранить сумму на устройстве. Попробуйте ещё раз или скачайте JSON в настройках.");
+      personalBasis = null;
+      sync();
+      if (intro) dismissMoney();
+      $("personal-saved").textContent = shared?.active ? "Сумма записана на устройстве · ожидает синхронизации с общим бюджетом." : "Сумма участника сохранена на этом устройстве.";
+    } catch (error) {
+      $(prefix + "-error").textContent = error.message;
+    }
+  }
   function sync() {
+    const people = E.participants(state);
+    for (const id of ["personal-person", "money-person", "event-person"]) {
+      const selected = $(id).value || "0";
+      $(id).innerHTML = people.map((p, i) => `<option value="${i}">${escape(p.name)}</option>`).join("");
+      $(id).value = selected;
+    }
+    $("balance").readOnly = !!state.people;
+    $("apply").textContent = state.people ? "Обновить дату отсчёта" : "Сохранить остаток";
+    if (!personalBasis) fillPersonal();
     $("start").value = state.start;
     if (document.activeElement !== $("balance"))
       $("balance").value = (state.balance / 100).toFixed(2);
@@ -956,6 +1063,8 @@
       draw();
     },
     onLocal: () => {
+      $("money-dialog").close();
+      personalBasis = null;
       state = empty();
       load();
       sync();
@@ -964,7 +1073,7 @@
     },
     onAccount: ({ signedIn, active, connected, busy, lostSession }) => {
       const accountOpen = !$("account").hidden;
-      if (lostSession) tab("account");
+      if (lostSession) { $("money-dialog").close(); tab("account"); }
       else if (accountOpen && connected) tab("overview");
       if (!$("account").hidden)
         $("heading").textContent = signedIn
@@ -972,6 +1081,7 @@
             ? "Открываем общий бюджет…"
             : "Аккаунт и общий бюджет"
           : "Вход в аккаунт";
+      if (active && !busy) maybeAskMoney();
     },
   });
 })();

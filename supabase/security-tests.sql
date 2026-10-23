@@ -57,6 +57,25 @@ begin
     raise exception 'TEST FAILED: invalid budget accepted';
     exception when raise_exception then if SQLERRM like 'TEST FAILED:%' then raise; end if; end;
   if public.kontur_valid_date('2026-02-31') then raise exception 'TEST FAILED: invalid date accepted'; end if;
+  -- Participant totals are checked and same-total name/ownership changes have undo history.
+  perform set_config('request.jwt.claim.sub',alice::text,true);
+  result := public.kontur_read();
+  data := jsonb_set(result->'data','{people}',
+    '[{"name":"Test one","balance":60,"ready":true},{"name":"Test two","balance":40,"ready":true}]'::jsonb);
+  perform public.kontur_validate(data);
+  begin
+    perform public.kontur_validate(jsonb_set(data,'{people,1,balance}','41'));
+    raise exception 'TEST FAILED: mismatched participant total accepted';
+    exception when raise_exception then if SQLERRM like 'TEST FAILED:%' then raise; end if;
+  end;
+  result := public.kontur_save((result->>'revision')::bigint,data);
+  if result->>'saved' <> 'true' or not (public.kontur_history()->0->'after' ? 'people')
+    then raise exception 'TEST FAILED: participant snapshot missing from history'; end if;
+  if not (public.kontur_authored(data - 'people',data) ? 'people')
+    then raise exception 'TEST FAILED: old client erased participant balances'; end if;
+  perform public.kontur_undo((public.kontur_history()->0->>'id')::uuid,(result#>>'{budget,revision}')::bigint);
+  if public.kontur_read()->'data' ? 'people'
+    then raise exception 'TEST FAILED: participant snapshot undo failed'; end if;
   raise notice 'All database security and revision tests passed';
 end $$;
 select 'PASS: RLS, anonymous/outsider denial, owner invite, two-member limit, injection input, validation, optimistic concurrency' as result;

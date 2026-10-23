@@ -22,9 +22,9 @@
     // Date and balance form one accounting snapshot and must be merged atomically.
     const snapshot = pick(
       "snapshot",
-      [base.start, base.balance],
-      [local.start, local.balance],
-      [remote.start, remote.balance],
+      [base.start, base.balance, base.people],
+      [local.start, local.balance, local.people],
+      [remote.start, remote.balance, remote.people],
     );
     const maps = [base, local, remote].map(
       (x) => new Map(x.events.map((e) => [e.id, e])),
@@ -39,6 +39,7 @@
         version: 1,
         start: snapshot[0],
         balance: snapshot[1],
+        ...(snapshot[2] ? { people: snapshot[2] } : {}),
         events,
       }),
       conflicts,

@@ -17,4 +17,5 @@ assert.match(copy.describeEvent({ ...event, repeat: "twice", days: [5, 20] }), /
 assert.match(copy.describeEvent({ ...event, repeat: "twice" }), /Дни месяца: 10, 25/);
 assert.match(copy.describeEvent({ ...event, type: "income" }), /Основной доход: да/);
 assert.equal(copy.describeEvent(undefined), "Удалено");
+assert.match(copy.describeEvent({ ...event, person: 1 }, { people: [{ name: "Данила" }, { name: "Алёна" }] }), /Чьи деньги: Алёна/);
 console.log("Budget descriptions distinguish payments and every editable setting");

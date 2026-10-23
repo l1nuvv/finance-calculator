@@ -71,6 +71,23 @@ begin
     or jsonb_typeof(p_data->'events') is distinct from 'array' then raise exception 'Неверный формат бюджета'; end if;
   if abs((p_data->>'balance')::numeric) > 1000000000000 or jsonb_array_length(p_data->'events') > 5000
     then raise exception 'Превышен лимит бюджета'; end if;
+  if p_data ? 'people' then
+    if jsonb_typeof(p_data->'people') <> 'array' or jsonb_array_length(p_data->'people') <> 2
+      then raise exception 'В бюджете должно быть два участника'; end if;
+    for n in select value from jsonb_array_elements(p_data->'people') loop
+      if jsonb_typeof(n) <> 'object' or jsonb_typeof(n->'name') is distinct from 'string'
+        or length(btrim(n->>'name')) not between 1 and 80
+        or jsonb_typeof(n->'balance') is distinct from 'number' or coalesce(n->>'balance','') !~ '^-?[0-9]+$'
+        or abs((n->>'balance')::numeric) > 1000000000000
+        or jsonb_typeof(n->'ready') is distinct from 'boolean'
+        or (n ? 'login' and (jsonb_typeof(n->'login') <> 'string' or n->>'login' !~ '^[a-z0-9_-]{3,32}$'))
+        then raise exception 'Неверные данные участника'; end if;
+    end loop;
+    if (p_data#>>'{people,0,balance}')::numeric + (p_data#>>'{people,1,balance}')::numeric <> (p_data->>'balance')::numeric
+      then raise exception 'Общий остаток не равен сумме денег участников'; end if;
+    if p_data#>>'{people,0,login}' = p_data#>>'{people,1,login}'
+      then raise exception 'Выберите разные аккаунты участников'; end if;
+  end if;
   for e in select value from jsonb_array_elements(p_data->'events') loop
     if jsonb_typeof(e) <> 'object' or jsonb_typeof(e->'id') is distinct from 'string'
       or length(btrim(e->>'id')) not between 1 and 100
@@ -87,6 +104,8 @@ begin
     if e ? 'category' and (jsonb_typeof(e->'category') <> 'string' or length(e->>'category') > 40)
       then raise exception 'Неверная категория'; end if;
     if e ? 'paid' and jsonb_typeof(e->'paid') <> 'boolean' then raise exception 'Неверный статус оплаты'; end if;
+    if e ? 'person' and (jsonb_typeof(e->'person') <> 'number' or e->>'person' not in ('0','1'))
+      then raise exception 'Неверный участник операции'; end if;
     if e ? 'author' and (jsonb_typeof(e->'author') <> 'string' or e->>'author' !~ '^[a-z0-9_-]{3,32}$')
       then raise exception 'Неверный автор операции'; end if;
     if (e ? 'required' and jsonb_typeof(e->'required') <> 'boolean') or
@@ -128,14 +147,16 @@ begin
   if login is null or login !~ '^[a-z0-9_-]{3,32}$' then login := 'participant'; end if;
   select coalesce(jsonb_agg(
     (e.value - 'author') || coalesce((select jsonb_object_agg(k,old.value->k)
-      from unnest(array['actuals','required','salary']) k where old.value ? k and not e.value ? k),'{}'::jsonb) || case
+      from unnest(array['actuals','required','salary','person']) k where old.value ? k and not e.value ? k),'{}'::jsonb) || case
       when old.value is null then jsonb_build_object('author', login)
       when old.value ? 'author' then jsonb_build_object('author', old.value->'author')
       else '{}'::jsonb end order by e.ordinality), '[]'::jsonb)
   into result from jsonb_array_elements(p_data->'events') with ordinality e(value, ordinality)
   left join jsonb_array_elements(coalesce(p_previous->'events', '[]'::jsonb)) old(value)
     on old.value->>'id' = e.value->>'id';
-  return jsonb_set(p_data, '{events}', result);
+  return jsonb_set(p_data, '{events}', result) ||
+    case when p_previous ? 'people' and not p_data ? 'people'
+      then jsonb_build_object('people',p_previous->'people') else '{}'::jsonb end;
 end $$;
 
 create or replace function public.kontur_read() returns jsonb
@@ -163,10 +184,12 @@ begin
   from jsonb_array_elements(coalesce(p_before->'events','[]'::jsonb)) a(value)
   full join jsonb_array_elements(p_after->'events') b(value) on a.value->>'id'=b.value->>'id'
   where a.value is distinct from b.value;
-  if p_before is not null and (p_before->'start' is distinct from p_after->'start' or p_before->'balance' is distinct from p_after->'balance') then
+  if p_before is not null and (p_before->'start' is distinct from p_after->'start' or p_before->'balance' is distinct from p_after->'balance' or p_before->'people' is distinct from p_after->'people') then
     insert into public.kontur_changes(budget_id,action,actor,before_data,after_data,undo_of)
-    values(p_budget,'snapshot',login,jsonb_build_object('start',p_before->'start','balance',p_before->'balance'),
-      jsonb_build_object('start',p_after->'start','balance',p_after->'balance'),p_undo);
+    values(p_budget,'snapshot',login,jsonb_build_object('start',p_before->'start','balance',p_before->'balance') ||
+      case when p_before ? 'people' then jsonb_build_object('people',p_before->'people') else '{}'::jsonb end,
+      jsonb_build_object('start',p_after->'start','balance',p_after->'balance') ||
+      case when p_after ? 'people' then jsonb_build_object('people',p_after->'people') else '{}'::jsonb end,p_undo);
   end if;
 end $$;
 
@@ -195,9 +218,10 @@ begin
   select * into row_data from public.kontur_budgets where id=budget for update;
   if row_data.revision is distinct from p_revision then return jsonb_build_object('saved',false,'budget',public.kontur_read()); end if;
   if change.event_id is null then
-    if jsonb_build_object('start',row_data.data->'start','balance',row_data.data->'balance') is distinct from change.after_data
+    if (jsonb_build_object('start',row_data.data->'start','balance',row_data.data->'balance') ||
+      case when row_data.data ? 'people' then jsonb_build_object('people',row_data.data->'people') else '{}'::jsonb end) is distinct from change.after_data
       then raise exception 'Остаток или дата уже изменились. Отмена остановлена'; end if;
-    next_data := row_data.data || change.before_data;
+    next_data := (row_data.data - 'people') || change.before_data;
   else
     select value into current_event from jsonb_array_elements(row_data.data->'events') where value->>'id'=change.event_id;
     if current_event is distinct from change.after_data then raise exception 'Операция уже изменилась. Отмена остановлена'; end if;

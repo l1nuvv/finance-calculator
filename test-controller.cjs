@@ -97,6 +97,10 @@ async function test(name, fn) {
       await c.connect();
       assert.equal(adopted.id,"cached-budget");
       assert.equal(adopted.revision,3);
+      assert.equal(adopted.owner,null);
+      context.localStorage[cacheKey] = JSON.stringify({base:state(),local:state(),revision:3,owner:true});
+      await c.connect();
+      assert.equal(adopted.owner,true);
       db.read=async()=>{throw Error("Access revoked");};
       adopted=null;
       await assert.rejects(()=>c.connect(),/Access revoked/);
@@ -247,12 +251,15 @@ async function test(name, fn) {
       });
       const base = state([baseEvent]);
       const merged = S.merge(base, state([facts(2900000, "2026-10-10")]), state([facts(3100000, "2026-10-11")]));
-      context.SharedBudget.prototype.renderConflicts.call({ conflicts: merged.conflicts });
+      context.SharedBudget.prototype.renderConflicts.call({ conflicts: merged.conflicts, getData: () => ({
+        ...base, people: [{name:"Данила",balance:0,ready:true},{name:"Алёна",balance:0,ready:true}],
+      }) });
       const text = host.children[1].children[0].textContent;
       assert.ok(text.includes(E.amount(2900000)) && text.includes(E.amount(3100000)));
       assert.match(text, /10 октября 2026/);
       assert.match(text, /11 октября 2026/);
       assert.match(text, /Повторение: Каждый месяц/);
+      assert.match(text, /Чьи деньги: Данила/);
       assert.ok(!text.includes("monthly") && !text.includes("confirmed"));
     } finally { context.document = originalDocument; }
   });

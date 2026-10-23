@@ -21,7 +21,7 @@
     actual: "Уже известно точно",
   };
   // Plain text only: callers must use textContent or escape before inserting HTML.
-  function describeEvent(value) {
+  function describeEvent(value, data) {
     if (!value) return "Удалено";
     const repeat = value.repeat || "once";
     const lines = [
@@ -43,6 +43,7 @@
       `Обязательный расход: ${(value.required ?? ["expense", "repay"].includes(value.type)) ? "да" : "нет"}`,
       `Основной доход: ${(value.salary ?? value.type === "income") ? "да" : "нет"}`,
       `Добавил(а): ${value.author || "автор не указан"}`,
+      `Чьи деньги: ${data ? E.participants(data)[E.eventPerson(data, value)].name : value.person === 1 ? "второй участник" : "первый участник"}`,
     );
     const facts = [...(value.actuals || [])].sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
     lines.push(facts.length ? "Отмеченные платежи:" : "Отмеченные платежи: нет");
